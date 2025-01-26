@@ -1,5 +1,4 @@
-const baseUrl = "http://127.0.0.1:8000";
-
+const baseUrl = window.location.origin;
 
 
 
@@ -15,6 +14,8 @@ document.addEventListener("DOMContentLoaded", () => {
     restoreState();
 });
 
+
+// Восстановление состояния при загрузке страницы
 function restoreState() {
     const username = getFromLocalStorage("username");
 
@@ -27,25 +28,29 @@ function restoreState() {
         return;
     }
 
-    fetch(`${baseUrl}/profile/${username}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error("Ошибка при загрузке профиля");
-            }
-            return response.json();
-        })
-        .then(data => {
-            updateProfile(username, data);
-            console.log("Профиль успешно загружен:", data);
-        })
-        .catch(error => {
-            console.error("Ошибка при восстановлении состояния:", error);
-            removeFromLocalStorage("username");
-            if (!window.alreadyRedirected) {
-                window.alreadyRedirected = true;
-                window.location.href = "register.html";
-            }
-        });
+    fetch(`${baseUrl}/profile/${username}`, {
+      headers: {
+        "Authorization": "Bearer " + localStorage.getItem("token")
+    }
+})
+    .then(response => {
+        if (!response.ok) {
+            throw new Error("Ошибка при загрузке профиля");
+        }
+        return response.json();
+    })
+    .then(data => {
+        updateProfile(username, data);
+        console.log("Профиль успешно загружен:", data);
+    })
+    .catch(error => {
+        console.error("Ошибка при восстановлении состояния:", error);
+        removeFromLocalStorage("username");
+        if (!window.alreadyRedirected) {
+            window.alreadyRedirected = true;
+            window.location.href = "register.html";
+        }
+    });
 }
 
 
@@ -82,26 +87,38 @@ async function register() {
         return;
     }
 
+    // 1. Сначала запрос пароля:
+    const password = prompt("Введите пароль:");
+    if (!password) {
+        alert("Пароль не может быть пустым.");
+        return;
+    }
+
     try {
+        // 2. Теперь делаем fetch
         const response = await fetch(`${baseUrl}/register`, {
             method: "POST",
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ username: username })
+            body: JSON.stringify({ username: username, password: password })
         });
+
         const data = await response.json();
 
         if (response.ok) {
-            saveToLocalStorage("username", username); // Сохраняем имя пользователя
-            window.location.href = "game.html"; // Перенаправляем на страницу игры
+            saveToLocalStorage("username", username);
+            // ВАЖНО: сохраняем токен
+            localStorage.setItem("token", data.access_token);
+            window.location.href = "game.html";
         } else {
-            alert(data.message || "Registration failed.");
+            alert(data.detail || "Registration failed.");
         }
     } catch (error) {
         alert("An error occurred during registration. Please try again.");
     }
 }
+
 
 function switchToMainInterface() {
     document.getElementById("registration").classList.add("hidden"); // Скрываем регистрацию
@@ -121,7 +138,11 @@ async function dailyReward() {
     showAnimation("daily");
 
     try {
-        const response = await fetch(`${baseUrl}/daily/${username}`);
+        const response = await fetch(`${baseUrl}/daily/${username}`, {
+          headers: {
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        }
+    });
         const data = await response.json();
         if (data.total_coins) {
             document.getElementById("stat-coins").innerText = data.total_coins;
@@ -150,7 +171,11 @@ async function workReward() {
     showAnimation("work");
 
     try {
-        const response = await fetch(`${baseUrl}/work/${username}`);
+        const response = await fetch(`${baseUrl}/work/${username}`, {
+          headers: {
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        }
+    });
         const data = await response.json();
         if (data.total_coins) {
             document.getElementById("stat-coins").innerText = data.total_coins;
@@ -185,7 +210,11 @@ async function playDice() {
     showElementById("dice-animation");
 
     try {
-        const response = await fetch(`${baseUrl}/games/dice/${username}?bet=${bet}`);
+        const response = await fetch(`${baseUrl}/games/dice/${username}?bet=${bet}`, {
+          headers: {
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        }
+    });
         if (!response.ok) {
             const errorData = await response.json();
             logMessage(errorData.detail || "Ошибка при броске кубика", "error");
@@ -243,6 +272,7 @@ async function buyRolls() {
         const response = await fetch(`${baseUrl}/buy-rolls/${username}`, {
             method: "POST",
             headers: {
+                "Authorization": "Bearer " + localStorage.getItem("token"),
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ rolls: rollsToBuy })
@@ -274,6 +304,7 @@ async function buyAdditionalRolls(username) {
         const response = await fetch(`${baseUrl}/buy-rolls/${username}`, {
             method: "POST",
             headers: {
+                "Authorization": "Bearer " + localStorage.getItem("token"),
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ rolls: rollsToBuy })
@@ -395,45 +426,6 @@ function restoreLogs() {
 }
 
 
-// Восстановление состояния при загрузке страницы
-function restoreState() {
-    const username = getFromLocalStorage("username");
-
-    if (!username) {
-        // Логика предотвращения бесконечного перенаправления
-        if (!window.alreadyRedirected) {
-            console.log("Пользователь не найден, перенаправление на register.html...");
-            window.alreadyRedirected = true; // Флаг для предотвращения повторных вызовов
-            window.location.href = "register.html";
-        }
-        return; // Завершаем выполнение функции
-    }
-
-    // Если пользователь найден, загружаем профиль
-    fetch(`${baseUrl}/profile/${username}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error("Ошибка при загрузке профиля");
-            }
-            return response.json();
-        })
-        .then(data => {
-            updateProfile(username, data);
-            console.log("Профиль успешно загружен:", data);
-        })
-        .catch(error => {
-            console.error("Ошибка при восстановлении состояния:", error);
-            removeFromLocalStorage("username");
-            if (!window.alreadyRedirected) {
-                window.alreadyRedirected = true;
-                window.location.href = "register.html";
-            }
-        });
-}
-
-
-
-
 // функции для управления меню:
 function toggleSettingsMenu() {
     const settingsMenu = document.getElementById("settings-menu");
@@ -469,6 +461,7 @@ async function selectAvatar(avatarName) {
         const response = await fetch(`${baseUrl}/set-avatar/${username}`, {
             method: "POST",
             headers: {
+                "Authorization": "Bearer " + localStorage.getItem("token"),
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ avatar: avatarName })

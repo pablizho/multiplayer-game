@@ -13,6 +13,7 @@ class PlayerModel(Base):
     __tablename__ = "players"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
+    hashed_password = Column(String, nullable=False)  # ← добавили
     coins = Column(Integer, default=100)
     rank = Column(String, default="Новичок")
     last_daily = Column(DateTime, nullable=True)

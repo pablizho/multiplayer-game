@@ -5,14 +5,36 @@ from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from jose import JWTError, jwt
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from datetime import datetime, timedelta
+from fastapi import Header
 import random
 from pydantic import BaseModel
 from fastapi import UploadFile, File
 from fastapi.staticfiles import StaticFiles
+from passlib.context import CryptContext
 import os
 
 
+SECRET_KEY = "jOUL2fquxO3j9AG1UPHZ3j9AG1UPHZ8NPXSIaoLUoJWKWvjrqAmJUY0phRanVpyLT8RI3VB7TsmFsdWGAXIasFrNKLThA3UpZk6W"  # Замените на свой длинный ключ
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_HOURS = 24  # Срок жизни токена
+
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+
+
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Папка для хранения аватарок
 AVATARS_DIR = "avatars"
@@ -30,6 +52,7 @@ class PlayerModel(Base):
     __tablename__ = "players"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
+    hashed_password = Column(String, nullable=False)  # ← добавили
     coins = Column(Integer, default=100)
     rank = Column(String, default="Новичок")
     last_daily = Column(DateTime, nullable=True)
@@ -62,9 +85,35 @@ def get_db():
     finally:
         db.close()
 
+
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")  
+# ↑ Обычно указывают URL, где получают токен. У нас "/login"
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme),  # будет читать заголовок Authorization
+    db: Session = Depends(get_db)
+) -> PlayerModel:
+    """Проверяем токен, ищем пользователя в базе."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Could not validate token")
+
+    user = db.query(PlayerModel).filter_by(username=username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return user
+
+
 # Модель для регистрации
 class RegisterRequest(BaseModel):
     username: str
+    password: str  # ← добавили
 
 # Модель для запроса на покупку бросков
 class BuyRollsRequest(BaseModel):
@@ -72,23 +121,77 @@ class BuyRollsRequest(BaseModel):
 
 # Эндпоинт для регистрации
 @app.post("/register")
-async def register(request: RegisterRequest, db: Session = Depends(get_db)):
-    username = request.username
-    player = db.query(PlayerModel).filter(PlayerModel.username == username).first()
-    if player:
-        return {"message": f"Игрок {username} уже существует.", "coins": player.coins}
-    new_player = PlayerModel(username=username, coins=100)
+def register(request: RegisterRequest, db: Session = Depends(get_db)):
+    # проверяем, нет ли уже такого имени
+    existing = db.query(PlayerModel).filter_by(username=request.username).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Пользователь уже существует")
+
+    # хэшируем пароль
+    hashed_pw = pwd_context.hash(request.password)
+
+    # создаём игрока
+    new_player = PlayerModel(
+        username=request.username,
+        hashed_password=hashed_pw,
+        coins=100
+    )
     db.add(new_player)
     db.commit()
     db.refresh(new_player)
-    return {"message": f"Игрок {username} успешно зарегистрирован.", "coins": new_player.coins}
+
+    # Создаём токен сразу
+    access_token_expires = timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
+    access_token = create_access_token(
+        data={"sub": new_player.username},
+        expires_delta=access_token_expires
+    )
+    return {
+        "message": "Регистрация успешна",
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
+
+# Модель для логина
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+# Эндпойнт для логина
+@app.post("/login")
+def login(request: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(PlayerModel).filter_by(username=request.username).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Неверное имя пользователя или пароль")
+    # проверяем пароль
+    if not pwd_context.verify(request.password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Неверное имя пользователя или пароль")
+
+    # создаём токен, в "sub" пишем username
+    access_token_expires = timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
+    access_token = create_access_token(
+        data={"sub": user.username},
+        expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
 
 # Эндпоинт для получения профиля
 @app.get("/profile/{username}")
-async def get_profile(username: str, db: Session = Depends(get_db)):
+def get_profile(
+    username: str,
+    db: Session = Depends(get_db),
+    current_user: PlayerModel = Depends(get_current_user)
+):
+
+# проверяем, что запрашивающий токен соответствует path
+    if current_user.username != username:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
     player = db.query(PlayerModel).filter(PlayerModel.username == username).first()
     if not player:
         raise HTTPException(status_code=404, detail="Игрок не найден.")
+
 
     now = datetime.now()
     if player.last_free_roll:
@@ -319,3 +422,7 @@ async def get_timers(username: str, db: Session = Depends(get_db)):
         "work": work_timer,
         "free_rolls": free_roll_timer,
     }
+
+@app.get("/")
+def read_root():
+    return RedirectResponse(url="/static/register.html")
