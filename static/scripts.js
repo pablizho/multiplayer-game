@@ -10,6 +10,20 @@ document.addEventListener("DOMContentLoaded", () => {
         return; // Завершаем выполнение для страницы регистрации
     }
 
+    if (window.location.pathname.includes("game.html")) {
+        console.log("Страница игры: восстановление состояния...");
+        restoreState();
+    }
+
+    if (currentPath.includes("register.html")) {
+        console.log("Находимся на странице регистрации. Проверка пользователя не требуется.");
+        return;
+    }
+
+    if (currentPath.includes("game.html")) {
+        console.log("Находимся на странице игры. Восстановление состояния...");
+    }
+
     console.log("Инициализация restoreState...");
     restoreState();
 });
@@ -17,41 +31,57 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Восстановление состояния при загрузке страницы
 function restoreState() {
-    const username = getFromLocalStorage("username");
+    const token = localStorage.getItem("token");
 
-    if (!username) {
-        if (!window.alreadyRedirected) {
-            console.log("Пользователь не найден, перенаправление на register.html...");
-            window.alreadyRedirected = true;
+    if (!token) {
+        console.log("Токен отсутствует, перенаправление на регистрацию...");
+        if (!window.location.pathname.includes("register.html")) {
             window.location.href = "register.html";
         }
         return;
     }
 
-    fetch(`${baseUrl}/profile/${username}`, {
-      headers: {
-        "Authorization": "Bearer " + localStorage.getItem("token")
-    }
-})
-    .then(response => {
-        if (!response.ok) {
-            throw new Error("Ошибка при загрузке профиля");
+    fetch(`${baseUrl}/validate-token`, {
+        headers: {
+            "Authorization": "Bearer " + token
         }
-        return response.json();
     })
-    .then(data => {
-        updateProfile(username, data);
-        console.log("Профиль успешно загружен:", data);
-    })
-    .catch(error => {
-        console.error("Ошибка при восстановлении состояния:", error);
-        removeFromLocalStorage("username");
-        if (!window.alreadyRedirected) {
-            window.alreadyRedirected = true;
-            window.location.href = "register.html";
-        }
-    });
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 401) {
+                    console.error("Токен недействителен, перенаправление на регистрацию...");
+                    localStorage.removeItem("token");
+                    localStorage.removeItem("username");
+                    if (!window.location.pathname.includes("register.html")) {
+                        window.location.href = "register.html";
+                    }
+                } else {
+                    console.error("Ошибка сервера:", response.status);
+                }
+                return null;
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data) {
+                console.log("Токен действителен, профиль успешно загружен:", data);
+                updateProfile(data.username, data);
+                if (!window.location.pathname.includes("game.html")) {
+                    window.location.href = "game.html";
+                }
+            }
+        })
+        .catch(error => {
+            console.error("Ошибка при проверке токена:", error);
+            localStorage.removeItem("token");
+            localStorage.removeItem("username");
+            if (!window.location.pathname.includes("register.html")) {
+                window.location.href = "register.html";
+            }
+        });
 }
+
+
 
 
 
@@ -87,7 +117,7 @@ async function register() {
         return;
     }
 
-    // 1. Сначала запрос пароля:
+    // Запрос пароля
     const password = prompt("Введите пароль:");
     if (!password) {
         alert("Пароль не может быть пустым.");
@@ -95,7 +125,6 @@ async function register() {
     }
 
     try {
-        // 2. Теперь делаем fetch
         const response = await fetch(`${baseUrl}/register`, {
             method: "POST",
             headers: {
@@ -107,9 +136,9 @@ async function register() {
         const data = await response.json();
 
         if (response.ok) {
-            saveToLocalStorage("username", username);
-            // ВАЖНО: сохраняем токен
+            // Сохраняем токен и имя пользователя
             localStorage.setItem("token", data.access_token);
+            localStorage.setItem("username", username);
             window.location.href = "game.html";
         } else {
             alert(data.detail || "Registration failed.");
@@ -118,6 +147,7 @@ async function register() {
         alert("An error occurred during registration. Please try again.");
     }
 }
+
 
 
 function switchToMainInterface() {

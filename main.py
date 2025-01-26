@@ -111,6 +111,32 @@ def get_current_user(
     return user
 
 
+
+@app.get("/validate-token")
+def validate_token(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    """Проверяет токен и возвращает профиль пользователя, если токен валиден."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    user = db.query(PlayerModel).filter_by(username=username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "username": user.username,
+        "coins": user.coins,
+        "rank": user.rank,
+        "free_rolls": user.free_rolls,
+        "avatar": user.avatar
+    }
+
+
+
 # Модель для регистрации
 class RegisterRequest(BaseModel):
     username: str
@@ -123,15 +149,15 @@ class BuyRollsRequest(BaseModel):
 # Эндпоинт для регистрации
 @app.post("/register")
 def register(request: RegisterRequest, db: Session = Depends(get_db)):
-    # проверяем, нет ли уже такого имени
+    # Проверяем, нет ли уже такого пользователя
     existing = db.query(PlayerModel).filter_by(username=request.username).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Пользователь уже существует")
+        raise HTTPException(status_code=400, detail="Пользователь уже существует. Пожалуйста, войдите в систему.")
 
-    # хэшируем пароль
+    # Хэшируем пароль
     hashed_pw = pwd_context.hash(request.password)
 
-    # создаём игрока
+    # Создаём игрока
     new_player = PlayerModel(
         username=request.username,
         hashed_password=hashed_pw,
@@ -152,6 +178,7 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
         "access_token": access_token,
         "token_type": "bearer"
     }
+
 
 # Модель для логина
 class LoginRequest(BaseModel):
@@ -426,4 +453,12 @@ async def get_timers(username: str, db: Session = Depends(get_db)):
 
 @app.get("/")
 def read_root():
+    token = None
+    try:
+        token = jwt.decode(request.headers.get("Authorization", "").replace("Bearer ", ""), SECRET_KEY, algorithms=[ALGORITHM])
+    except Exception:
+        pass
+
+    if token and "sub" in token:
+        return RedirectResponse(url="/static/game.html")
     return RedirectResponse(url="/static/register.html")
