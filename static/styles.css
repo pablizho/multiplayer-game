@@ -9,40 +9,20 @@ body {
 /* Основной контейнер */
 .container {
     display: flex;
+    flex-direction: column;
     height: 100vh;
+    padding: 10px;
+    box-sizing: border-box;
 }
 
 /* Боковая панель */
 .stats-panel {
-    width: 250px;
+    width: 100%;
     background: #282c34;
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-}
-
-#profile {
-    text-align: center;
-}
-
-.avatar {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    margin-bottom: 10px;
-}
-
-.stats p {
-    margin: 10px 0;
-    font-size: 16px;
-}
-
-.stats span {
-    color: #00d9ff;
-    font-weight: bold;
+    margin-bottom: 20px;
 }
 
 /* Центральная панель */
@@ -54,7 +34,41 @@ main {
     border-radius: 8px;
     padding: 20px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    margin-left: 20px;
+    position: relative;
+}
+
+/* Общие элементы */
+#profile {
+    text-align: center;
+}
+
+/* Увеличиваем аватарку */
+.avatar {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    margin: 0 auto 15px;
+    border: 3px solid var(--accent-color);
+    box-shadow: 0 0 15px rgba(0, 217, 255, 0.3);
+}
+
+/* Статистика под аватаркой */
+.stats {
+    text-align: center;
+    padding: 15px;
+    background: #2a2e3b;
+    border-radius: 8px;
+    margin-top: 15px;
+}
+
+.stats p {
+    margin: 12px 0;
+    font-size: 18px;
+}
+
+.stats span {
+    color: #00d9ff;
+    font-weight: bold;
 }
 
 header {
@@ -67,21 +81,83 @@ header h1 {
     margin: 0;
 }
 
+
+/* Стили для основных кнопок действий */
+.action-button {
+    display: block;
+    width: 100%;
+    max-width: 300px;
+    margin: 15px auto;
+    padding: 15px 25px;
+    background: linear-gradient(45deg, #3b3f52, #343a60);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.action-button:hover {
+    background: linear-gradient(45deg, #007bff, #0056b3);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
+}
+
+
+/* Стиль для поля ввода ставки */
+#bet {
+    display: block;
+    width: 100%;
+    max-width: 200px;
+    margin: 15px auto;
+    padding: 12px;
+    background: #2a2e3b;
+    border: 2px solid var(--accent-color);
+    border-radius: 8px;
+    color: white;
+    text-align: center;
+    font-size: 16px;
+}
+
+/* Исправления для области анимации */
 #animation-area {
-    height: 300px;
+    height: 200px;
     background: #1e1e2f;
     border: 2px dashed #50597b;
     border-radius: 8px;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden; /* Важное исправление */
     display: flex;
     justify-content: center;
     align-items: center;
-    margin-bottom: 20px;
+}
+
+/* Фикс для гифки/анимации */
+.animation-content {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* Сохраняет пропорции */
+    display: none;
+}
+
+.animation-content.active {
+    display: block;
+}
+
+/* Убираем лишний текст под анимацией */
+.tab-content {
+    display: none;
+    text-align: center;
 }
 
 .tabs {
     display: flex;
     justify-content: center;
     margin-bottom: 20px;
+    flex-wrap: wrap;
 }
 
 .tab-button {
@@ -89,11 +165,13 @@ header h1 {
     color: #fff;
     border: none;
     padding: 10px 20px;
-    margin: 0 5px;
+    margin: 5px;
     border-radius: 5px;
     cursor: pointer;
     font-size: 16px;
     transition: background 0.3s ease;
+    flex: 1 1 45%;
+    min-width: 120px;
 }
 
 .tab-button:hover,
@@ -119,17 +197,10 @@ header h1 {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
 }
 
-#debug-console h3 {
-    margin: 0;
-    padding: 0 0 10px 0;
-    border-bottom: 1px solid #50597b;
-    color: #00d9ff;
-}
-
 #debug-log {
-    max-height: 200px; /* Фиксированная высота */
-    height: 200px; /* Задаем фиксированную высоту */
-    overflow-y: auto; /* Полоса прокрутки, если текст превышает размер */
+    max-height: 200px;
+    height: 200px;
+    overflow-y: auto;
     color: #fff;
     font-family: monospace;
     font-size: 14px;
@@ -141,24 +212,183 @@ header h1 {
     white-space: pre-wrap;
 }
 
+/* Анимации */
+#test-animation {
+    width: 40px;
+    height: 40px;
+    background-color: red;
+    border-radius: 50%;
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    animation: bounce 1.5s infinite ease-in-out;
+}
 
+@keyframes bounce {
+    0% { bottom: 0; }
+    50% { bottom: 120px; }
+    100% { bottom: 0; }
+}
 
+/* Десктопная версия */
+@media (min-width: 769px) {
+    .container {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 20px;
+    }
+    
+    .stats-panel {
+        width: 300px;
+        height: calc(100vh - 20px);
+        margin-bottom: 0;
+        position: sticky;
+        top: 10px;
+    }
+    
+    main {
+        flex: 1;
+        height: calc(100vh - 20px);
+        overflow-y: auto;
+        margin-left: 0;
+    }
+    
+    .tabs {
+        flex-wrap: nowrap;
+    }
+    
+    .tab-button {
+        flex: none;
+        min-width: 150px;
+    }
+    
+    #animation-area {
+        height: 300px;
+    }
+}
+
+/* Планшетная версия */
+@media (max-width: 768px) {
+    .stats-panel {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-around;
+        padding: 15px;
+    }
+
+    #profile {
+        display: flex;
+        align-items: center;
+        flex-direction: row;
+    }
+
+    .avatar {
+        width: 60px;
+        height: 60px;
+        margin: 0 10px 0 0;
+    }
+
+    .stats p {
+        margin: 5px 0;
+        font-size: 14px;
+    }
+
+    #animation-area {
+        height: 150px;
+    }
+
+    .tab-button {
+        padding: 10px 15px;
+        font-size: 14px;
+    }
+}
+
+/* Мобильная версия */
+@media (max-width: 480px) {
+    .stats-panel {
+        flex-direction: column;
+        padding: 10px;
+    }
+
+    #profile {
+        flex-direction: column;
+    }
+
+    .avatar {
+        width: 80px;
+        height: 80px;
+    }
+
+    .stats {
+        align-items: center;
+    }
+
+    #animation-area {
+        height: 120px;
+    }
+
+    .tab-button {
+        width: 100%;
+        font-size: 12px;
+    }
+
+    .stats p {
+        font-size: 16px;
+    }
+
+    .action-button {
+        padding: 12px 20px;
+        font-size: 14px;
+    }
+
+    #bet {
+        max-width: 150px;
+        padding: 10px;
+        font-size: 14px;
+    }
+
+  #debug-console {
+        display: block; /* Показываем консоль */
+        margin-top: 15px;
+        padding: 10px;
+    }
+}
+
+/* Дополнительные стили */
+/* Обновленный блок настроек */
 #settings-menu {
     margin-top: 20px;
-    padding: 10px;
-    background: #3b3f52;
+    padding: 15px;
+    background: #2a2e3b;
+    border-radius: 8px;
+    display: none;
+}
+
+#settings-menu button {
+    width: 100%;
+    padding: 12px;
+    margin: 8px 0;
+    background: var(--button-bg);
+    color: white;
+    border: none;
     border-radius: 5px;
-    display: none; /* Изначально скрыто */
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#settings-menu button:hover {
+    background: var(--button-active);
+    transform: translateY(-2px);
 }
 
 #settings-menu.active {
-    display: block; /* Показываем меню */
+    display: block;
 }
 
 .avatar-options img {
     width: 80px;
     height: 80px;
-    object-fit: cover;
     border-radius: 50%;
     margin: 10px;
     cursor: pointer;
@@ -173,87 +403,52 @@ header h1 {
     display: none;
 }
 
-#avatar-selector {
-    background: #2a2e3b;
-    padding: 20px;
-    border-radius: 8px;
-    text-align: center;
-    margin-top: 10px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
-}
-
-
-
 .log-message {
     padding: 5px;
     margin-bottom: 5px;
     border-radius: 4px;
     font-size: 14px;
 }
+
 .log-message .timestamp {
     font-weight: bold;
     color: #00d9ff;
 }
+
 .log-message.info {
     background: #2a2e3b;
-    color: #fff;
 }
+
 .log-message.success {
     background: #1e7e34;
-    color: #d4edda;
 }
+
 .log-message.error {
-    background: #ff4d4d; /* Более яркий красный */
-    color: #ffffff; /* Белый текст */
+    background: #ff4d4d;
 }
 
+/* Анимации для кнопок */
+@keyframes button-pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.action-button:active {
+    animation: button-pulse 0.3s ease;
+}
+
+/* Обновленные таймеры */
 .timer {
-    font-size: 14px;
-    font-weight: bold;
-    margin-left: 5px;
-    color: #ffa500; /* Цвет таймера */
+    font-size: 12px;
+    color: #ffa500;
+    margin-left: 8px;
+    vertical-align: middle;
 }
 
-
-/* Допустим, наша анимация — это колебание молотка */
-.hammer-animation {
-  width: 64px;
-  animation: hammer-swing 0.5s infinite alternate ease-in-out;
-}
-
-/* Можно регулировать время, градус поворота и т.д. */
-@keyframes hammer-swing {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(-30deg);
-  }
-}
-
-#animation-area {
-    width: 200px;
-    height: 200px;
-    background: #333; /* Тёмный фон для наглядности */
-    position: relative;
-    overflow: hidden; /* Чтобы шар не «вылетал» за границы */
-}
-
-#test-animation {
-    width: 40px;
-    height: 40px;
-    background-color: red;
-    border-radius: 50%; /* Делает квадрат круглым */
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    animation: bounce 1.5s infinite ease-in-out;
-}
-
-/* Ключевые кадры анимации */
-@keyframes bounce {
-    0%   { bottom: 0; }
-    50%  { bottom: 120px; }
-    100% { bottom: 0; }
+/* Добавим CSS переменные для удобства */
+:root {
+    --accent-color: #00d9ff;
+    --button-bg: #3b3f52;
+    --button-active: #007bff;
 }
