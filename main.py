@@ -1,4 +1,5 @@
 from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -114,19 +115,19 @@ def get_current_user(
 
 @app.get("/validate-token")
 def validate_token(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    """Проверяет токен и возвращает профиль пользователя, если токен валиден."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
-        if username is None:
+        if not username:
             raise HTTPException(status_code=401, detail="Invalid token")
-    except JWTError:
+        user = db.query(PlayerModel).filter_by(username=username).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+    except JWTError as e:
+        print(f"JWT Error: {str(e)}")
         raise HTTPException(status_code=401, detail="Invalid token")
-
-    user = db.query(PlayerModel).filter_by(username=username).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
+    
+    print(f"User {user.username} successfully validated.")
     return {
         "username": user.username,
         "coins": user.coins,
@@ -451,14 +452,21 @@ async def get_timers(username: str, db: Session = Depends(get_db)):
         "free_rolls": free_roll_timer,
     }
 
-@app.get("/")
-def read_root():
-    token = None
-    try:
-        token = jwt.decode(request.headers.get("Authorization", "").replace("Bearer ", ""), SECRET_KEY, algorithms=[ALGORITHM])
-    except Exception:
-        pass
 
-    if token and "sub" in token:
-        return RedirectResponse(url="/static/game.html")
-    return RedirectResponse(url="/static/register.html")
+@app.get("/")
+def read_root(token: str = Header(None), db: Session = Depends(get_db)):
+    if not token:
+        return RedirectResponse(url="/static/register.html")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if not username:
+            return RedirectResponse(url="/static/register.html")
+        user = db.query(PlayerModel).filter_by(username=username).first()
+        if not user:
+            return RedirectResponse(url="/static/register.html")
+    except JWTError:
+        return RedirectResponse(url="/static/register.html")
+    
+    # Если всё ок, перенаправляем на страницу игры
+    return JSONResponse({"message": "Valid token"}, status_code=200)

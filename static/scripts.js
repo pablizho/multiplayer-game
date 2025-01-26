@@ -5,81 +5,72 @@ const baseUrl = window.location.origin;
 // Вызов функции восстановления при загрузке страницы
 
 document.addEventListener("DOMContentLoaded", () => {
-    if (window.location.pathname.includes("register.html")) {
-        console.log("Находимся на странице регистрации. Проверка пользователя не требуется.");
-        return; // Завершаем выполнение для страницы регистрации
-    }
-
-    if (window.location.pathname.includes("game.html")) {
-        console.log("Страница игры: восстановление состояния...");
-        restoreState();
-    }
+    const currentPath = window.location.pathname;
 
     if (currentPath.includes("register.html")) {
-        console.log("Находимся на странице регистрации. Проверка пользователя не требуется.");
+        console.log("Находимся на странице регистрации. Проверка токена не требуется.");
         return;
     }
 
     if (currentPath.includes("game.html")) {
-        console.log("Находимся на странице игры. Восстановление состояния...");
+        console.log("Находимся на странице игры. Проверка токена...");
+        restoreState();
+        return;
     }
 
-    console.log("Инициализация restoreState...");
-    restoreState();
+    console.log("Неизвестный путь. Перенаправление...");
+    window.location.href = "register.html";
 });
 
 
+
+// Восстановление состояния при загрузке страницы
 // Восстановление состояния при загрузке страницы
 function restoreState() {
     const token = localStorage.getItem("token");
 
     if (!token) {
         console.log("Токен отсутствует, перенаправление на регистрацию...");
-        if (!window.location.pathname.includes("register.html")) {
-            window.location.href = "register.html";
-        }
+        window.location.href = "register.html";
         return;
     }
 
     fetch(`${baseUrl}/validate-token`, {
         headers: {
-            "Authorization": "Bearer " + token
+            "Authorization": `Bearer ${token}`
         }
     })
-        .then(response => {
-            if (!response.ok) {
-                if (response.status === 401) {
-                    console.error("Токен недействителен, перенаправление на регистрацию...");
-                    localStorage.removeItem("token");
-                    localStorage.removeItem("username");
-                    if (!window.location.pathname.includes("register.html")) {
-                        window.location.href = "register.html";
-                    }
-                } else {
-                    console.error("Ошибка сервера:", response.status);
-                }
-                return null;
-            }
+    .then(response => {
+        if (response.ok) {
+            console.log("Токен валиден. Загружаем профиль пользователя...");
             return response.json();
-        })
-        .then(data => {
-            if (data) {
-                console.log("Токен действителен, профиль успешно загружен:", data);
-                updateProfile(data.username, data);
-                if (!window.location.pathname.includes("game.html")) {
-                    window.location.href = "game.html";
-                }
-            }
-        })
-        .catch(error => {
-            console.error("Ошибка при проверке токена:", error);
+        } else {
+            console.error("Токен недействителен. Перенаправление на регистрацию...");
             localStorage.removeItem("token");
-            localStorage.removeItem("username");
-            if (!window.location.pathname.includes("register.html")) {
-                window.location.href = "register.html";
+            window.location.href = "register.html";
+        }
+    })
+    .then(data => {
+        if (data) {
+            console.log("Профиль пользователя загружен:", data);
+            localStorage.setItem("username", data.username);
+
+            // Если уже на game.html, НЕ перенаправляем заново:
+            if (!window.location.pathname.includes("game.html")) {
+                window.location.href = "game.html";
+            } else {
+                // Обновляем интерфейс игры
+                updateProfile(data.username, data);
             }
-        });
+        }
+    })
+    .catch(error => {
+        console.error("Ошибка при проверке токена:", error);
+        window.location.href = "register.html";
+    });
 }
+
+
 
 
 
