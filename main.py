@@ -454,9 +454,12 @@ async def get_timers(username: str, db: Session = Depends(get_db)):
 
 
 @app.get("/")
-def read_root(token: str = Header(None), db: Session = Depends(get_db)):
-    if not token:
+def read_root(authorization: str = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
         return RedirectResponse(url="/static/register.html")
+    
+    token = authorization.split(" ")[1]
+    
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
@@ -468,5 +471,5 @@ def read_root(token: str = Header(None), db: Session = Depends(get_db)):
     except JWTError:
         return RedirectResponse(url="/static/register.html")
     
-    # Если всё ок, перенаправляем на страницу игры
-    return JSONResponse({"message": "Valid token"}, status_code=200)
+    # Перенаправляем на страницу игры
+    return RedirectResponse(url="/static/game.html")

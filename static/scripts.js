@@ -7,6 +7,16 @@ const baseUrl = window.location.origin;
 document.addEventListener("DOMContentLoaded", () => {
     const currentPath = window.location.pathname;
 
+    const token = localStorage.getItem("token");
+    
+    if (token && !window.location.pathname.includes("game.html")) {
+        // Если есть токен, но мы не на game.html - перенаправляем
+        window.location.href = "game.html";
+    } else if (!token && window.location.pathname.includes("game.html")) {
+        // Если нет токена, но мы на game.html - перенаправляем на регистрацию
+        window.location.href = "register.html";
+    }
+
     if (currentPath.includes("register.html")) {
         console.log("Находимся на странице регистрации. Проверка токена не требуется.");
         return;
@@ -35,6 +45,7 @@ function restoreState() {
         return;
     }
 
+    // Добавляем токен в заголовки для всех последующих запросов
     fetch(`${baseUrl}/validate-token`, {
         headers: {
             "Authorization": `Bearer ${token}`
@@ -42,25 +53,19 @@ function restoreState() {
     })
     .then(response => {
         if (response.ok) {
-            console.log("Токен валиден. Загружаем профиль пользователя...");
             return response.json();
         } else {
-            console.error("Токен недействителен. Перенаправление на регистрацию...");
             localStorage.removeItem("token");
             window.location.href = "register.html";
         }
     })
     .then(data => {
         if (data) {
-            console.log("Профиль пользователя загружен:", data);
             localStorage.setItem("username", data.username);
-
-            // Если уже на game.html, НЕ перенаправляем заново:
+            updateProfile(data.username, data);
+            // Если мы уже на game.html, остаемся здесь
             if (!window.location.pathname.includes("game.html")) {
                 window.location.href = "game.html";
-            } else {
-                // Обновляем интерфейс игры
-                updateProfile(data.username, data);
             }
         }
     })
