@@ -1,0 +1,632 @@
+const baseUrl = "http://127.0.0.1:8000";
+
+
+
+
+// Вызов функции восстановления при загрузке страницы
+
+document.addEventListener("DOMContentLoaded", () => {
+    if (window.location.pathname.includes("register.html")) {
+        console.log("Находимся на странице регистрации. Проверка пользователя не требуется.");
+        return; // Завершаем выполнение для страницы регистрации
+    }
+
+    console.log("Инициализация restoreState...");
+    restoreState();
+});
+
+function restoreState() {
+    const username = getFromLocalStorage("username");
+
+    if (!username) {
+        if (!window.alreadyRedirected) {
+            console.log("Пользователь не найден, перенаправление на register.html...");
+            window.alreadyRedirected = true;
+            window.location.href = "register.html";
+        }
+        return;
+    }
+
+    fetch(`${baseUrl}/profile/${username}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("Ошибка при загрузке профиля");
+            }
+            return response.json();
+        })
+        .then(data => {
+            updateProfile(username, data);
+            console.log("Профиль успешно загружен:", data);
+        })
+        .catch(error => {
+            console.error("Ошибка при восстановлении состояния:", error);
+            removeFromLocalStorage("username");
+            if (!window.alreadyRedirected) {
+                window.alreadyRedirected = true;
+                window.location.href = "register.html";
+            }
+        });
+}
+
+
+
+// Логирование событий в консоль
+function logDebug(message) {
+    const debugLog = document.getElementById("debug-log");
+    const timestamp = new Date().toLocaleTimeString();
+    debugLog.textContent += `[${timestamp}] ${message}\n`;
+    debugLog.scrollTop = debugLog.scrollHeight; // Прокрутка вниз
+}
+
+// Сохранение данных в LocalStorage
+function saveToLocalStorage(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+}
+
+// Получение данных из LocalStorage
+function getFromLocalStorage(key) {
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : null;
+}
+
+// Удаление данных из LocalStorage
+function removeFromLocalStorage(key) {
+    localStorage.removeItem(key);
+}
+
+// Регистрация пользователя
+async function register() {
+    const username = document.getElementById("username").value.trim();
+    if (!username) {
+        alert("Please enter a username!");
+        return;
+    }
+
+    try {
+        const response = await fetch(`${baseUrl}/register`, {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username: username })
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            saveToLocalStorage("username", username); // Сохраняем имя пользователя
+            window.location.href = "game.html"; // Перенаправляем на страницу игры
+        } else {
+            alert(data.message || "Registration failed.");
+        }
+    } catch (error) {
+        alert("An error occurred during registration. Please try again.");
+    }
+}
+
+function switchToMainInterface() {
+    document.getElementById("registration").classList.add("hidden"); // Скрываем регистрацию
+    document.getElementById("tabs").classList.remove("hidden"); // Показываем игру
+    logDebug("Switched to main interface.");
+}
+
+// Сбор ежедневной награды
+async function dailyReward() {
+    const username = document.getElementById("profile-username").innerText;
+    if (!username || username === "Guest") {
+        logMessage("Пожалуйста, зарегистрируйтесь!", "error");
+        return;
+    }
+
+    // Показываем анимацию, что мы «запросили Daily»
+    showAnimation("daily");
+
+    try {
+        const response = await fetch(`${baseUrl}/daily/${username}`);
+        const data = await response.json();
+        if (data.total_coins) {
+            document.getElementById("stat-coins").innerText = data.total_coins;
+        }
+        logMessage(data.message, "success");
+    } catch (error) {
+        logMessage(`Ошибка при получении ежедневной награды: ${error}`, "error");
+    } finally {
+        // НЕ вызываем hideAllAnimations() здесь!
+        // Вместо этого обновим таймеры — они сами решат,
+        // показать или спрятать daily-анимацию
+        fetchTimers();
+    }
+}
+
+
+// Работа
+async function workReward() {
+    const username = document.getElementById("profile-username").innerText;
+    if (!username || username === "Guest") {
+        logMessage("Пожалуйста, зарегистрируйтесь!", "error");
+        return;
+    }
+
+    // Показываем анимацию «Работаем»
+    showAnimation("work");
+
+    try {
+        const response = await fetch(`${baseUrl}/work/${username}`);
+        const data = await response.json();
+        if (data.total_coins) {
+            document.getElementById("stat-coins").innerText = data.total_coins;
+        }
+        logMessage(data.message, "success");
+    } catch (error) {
+        logMessage(`Ошибка при работе: ${error}`, "error");
+    } finally {
+        // НЕ скрываем анимацию вручную,
+        // а даём fetchTimers() показать или спрятать «work-animation»
+        fetchTimers();
+    }
+}
+
+
+// Бросить кубик
+async function playDice() {
+    const username = document.getElementById("profile-username").innerText;
+    const betInput = document.getElementById("bet").value;
+    const bet = betInput ? parseInt(betInput, 10) : 0;
+
+    if (!username || username === "Guest") {
+        logMessage("Пожалуйста, зарегистрируйтесь!", "error");
+        return;
+    }
+    if (bet <= 0) {
+        logMessage("Ставка должна быть больше 0.", "error");
+        return;
+    }
+
+    // Показываем анимацию броска
+    showElementById("dice-animation");
+
+    try {
+        const response = await fetch(`${baseUrl}/games/dice/${username}?bet=${bet}`);
+        if (!response.ok) {
+            const errorData = await response.json();
+            logMessage(errorData.detail || "Ошибка при броске кубика", "error");
+            return;
+        }
+        const data = await response.json();
+
+        // Обновляем монеты, логи
+        if (data.total_coins !== undefined) {
+            document.getElementById("stat-coins").textContent = data.total_coins;
+        }
+        if (data.free_rolls !== undefined) {
+            document.getElementById("stat-free-rolls").textContent = data.free_rolls;
+        }
+        if (data.winnings < 0) {
+            logMessage(data.message, "error");
+        } else {
+            logMessage(data.message, "success");
+        }
+
+        // Даём анимации покрутиться ещё 2 секунды, потом скрываем
+        setTimeout(() => {
+            hideElementById("dice-animation");
+        }, 2000);
+
+    } catch (error) {
+        logMessage(`Ошибка: ${error.message}`, "error");
+        // Если запрос упал, можно тоже скрыть анимацию сразу
+        hideElementById("dice-animation");
+    } finally {
+        // Здесь можно ещё раз вызвать fetchTimers(),
+        // если хотите обновить счётчик free_rolls
+        fetchTimers();
+    }
+}
+
+
+
+//Эндпоинт для покупки бросков.
+// Покупка бросков
+async function buyRolls() {
+    const username = document.getElementById("profile-username").innerText;
+    if (!username || username === "Guest") {
+        logMessage("Пожалуйста, зарегистрируйтесь!", "error");
+        return;
+    }
+
+    const rollsToBuy = parseInt(prompt("Сколько бросков вы хотите купить? (1 бросок = 10 монет)"), 10);
+    if (isNaN(rollsToBuy) || rollsToBuy <= 0) {
+        logMessage("Некорректное количество бросков.", "error");
+        return;
+    }
+
+    try {
+        const response = await fetch(`${baseUrl}/buy-rolls/${username}`, {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ rolls: rollsToBuy })
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            document.getElementById("stat-coins").innerText = data.total_coins;
+            document.getElementById("stat-free-rolls").innerText = data.free_rolls;
+            logMessage(data.message, "success");
+        } else {
+            logMessage(data.detail || "Ошибка при покупке бросков.", "error");
+        }
+    } catch (error) {
+        logMessage(`Ошибка при покупке бросков: ${error}`, "error");
+    }
+}
+
+
+// Функция для покупки дополнительных бросков
+async function buyAdditionalRolls(username) {
+    const rollsToBuy = parseInt(prompt("Сколько бросков вы хотите купить? (1 бросок = 10 монет)"), 10);
+    if (isNaN(rollsToBuy) || rollsToBuy <= 0) {
+        alert("Некорректное количество бросков.");
+        return;
+    }
+
+    try {
+        const response = await fetch(`${baseUrl}/buy-rolls/${username}`, {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ rolls: rollsToBuy })
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            alert(data.message);
+            document.getElementById("stat-coins").innerText = data.total_coins;
+            document.getElementById("stat-free-rolls").innerText = data.free_rolls;
+        } else {
+            alert(data.detail || "Ошибка при покупке бросков.");
+        }
+    } catch (error) {
+        logDebug(`Error buying rolls: ${error}`);
+        alert("An error occurred while buying rolls.");
+    }
+}
+
+// Переход к основному интерфейсу
+function switchToMainInterface() {
+    document.getElementById("registration").classList.add("hidden");
+    document.getElementById("tabs").classList.remove("hidden");
+    logDebug("Switched to main interface.");
+}
+
+// Обновление профиля
+function updateProfile(username, data) {
+    document.getElementById("profile-username").innerText = username;
+    document.getElementById("stat-coins").innerText = data.coins || 0;
+    document.getElementById("stat-rank").innerText = data.rank || "---";
+    document.getElementById("stat-free-rolls").innerText = data.free_rolls || 0;
+
+    // Обновляем аватар
+    const avatarElement = document.getElementById("avatar");
+    avatarElement.src = `/static/avatars/${data.avatar}?v=` + new Date().getTime();
+
+    logMessage(
+      `Профиль обновлён: Имя = ${username}, Монеты = ${data.coins}, ` +
+      `Ранг = ${data.rank}, Free Rolls = ${data.free_rolls}`,
+      "info"
+    );
+
+    // <-- Добавляем вызов для таймеров, т.к. username уже точно не "Guest"
+    fetchTimers();
+}
+
+
+//  функцию для удаления профиля:
+async function deleteProfile() {
+    const username = document.getElementById("profile-username").innerText;
+    if (!username || username === "Guest") {
+        alert("Пожалуйста, зарегистрируйтесь!");
+        return;
+    }
+
+    const confirmDelete = confirm("Вы уверены, что хотите удалить свой профиль? Это действие нельзя отменить.");
+    if (!confirmDelete) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${baseUrl}/delete-profile/${username}`, {
+            method: "DELETE"
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            logMessage(data.message, "success");
+            removeFromLocalStorage("username"); // Удаляем имя пользователя
+            if (!window.alreadyRedirected) {
+                window.alreadyRedirected = true;
+                window.location.href = "register.html"; // Перенаправляем на страницу регистрации
+            }
+        } else {
+            logMessage(data.detail || "Ошибка при удалении профиля.", "error");
+        }
+    } catch (error) {
+        logMessage("Произошла ошибка при удалении профиля.", "error");
+    }
+}
+
+
+
+// Переключение вкладок
+function showTab(tabId) {
+    saveLogs(); // Сохраняем текущие логи
+
+    const tabs = document.querySelectorAll(".tab-content");
+    tabs.forEach(tab => tab.classList.remove("active"));
+    document.getElementById(tabId).classList.add("active");
+
+    const buttons = document.querySelectorAll(".tab-button");
+    buttons.forEach(btn => btn.classList.remove("active"));
+    event.target.classList.add("active");
+
+    restoreLogs(); // Восстанавливаем логи
+    logMessage(`Переключено на вкладку: ${tabId}`, "info");
+
+    // <-- Запоминаем текущую вкладку во "внешней" переменной
+    window.currentTab = tabId;
+
+    // Можно заново вызвать fetchTimers(), чтобы сразу обновить логику анимаций
+    fetchTimers();
+}
+
+
+let logHistory = [];
+
+function saveLogs() {
+    const debugLog = document.getElementById("debug-log");
+    logHistory = [...debugLog.children].map(child => child.outerHTML);
+}
+
+function restoreLogs() {
+    const debugLog = document.getElementById("debug-log");
+    debugLog.innerHTML = ""; // Очищаем перед восстановлением
+    logHistory.forEach(log => debugLog.innerHTML += log);
+}
+
+
+// Восстановление состояния при загрузке страницы
+function restoreState() {
+    const username = getFromLocalStorage("username");
+
+    if (!username) {
+        // Логика предотвращения бесконечного перенаправления
+        if (!window.alreadyRedirected) {
+            console.log("Пользователь не найден, перенаправление на register.html...");
+            window.alreadyRedirected = true; // Флаг для предотвращения повторных вызовов
+            window.location.href = "register.html";
+        }
+        return; // Завершаем выполнение функции
+    }
+
+    // Если пользователь найден, загружаем профиль
+    fetch(`${baseUrl}/profile/${username}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("Ошибка при загрузке профиля");
+            }
+            return response.json();
+        })
+        .then(data => {
+            updateProfile(username, data);
+            console.log("Профиль успешно загружен:", data);
+        })
+        .catch(error => {
+            console.error("Ошибка при восстановлении состояния:", error);
+            removeFromLocalStorage("username");
+            if (!window.alreadyRedirected) {
+                window.alreadyRedirected = true;
+                window.location.href = "register.html";
+            }
+        });
+}
+
+
+
+
+// функции для управления меню:
+function toggleSettingsMenu() {
+    const settingsMenu = document.getElementById("settings-menu");
+    settingsMenu.classList.toggle("active"); // Переключаем видимость меню
+}
+
+
+// Открыть модальное окно для выбора аватарки
+function openAvatarSelector() {
+    document.getElementById("avatar-selector-modal").classList.remove("hidden");
+}
+
+// Закрыть модальное окно
+function closeAvatarSelector() {
+    document.getElementById("avatar-selector-modal").classList.add("hidden");
+}
+
+// Открыть селектор аватарок
+function toggleAvatarSelector() {
+    const avatarSelector = document.getElementById("avatar-selector");
+    avatarSelector.classList.toggle("hidden");
+}
+
+// Выбрать аватарку
+async function selectAvatar(avatarName) {
+    const username = document.getElementById("profile-username").innerText;
+    if (!username || username === "Guest") {
+        alert("Пожалуйста, зарегистрируйтесь!");
+        return;
+    }
+
+    try {
+        const response = await fetch(`${baseUrl}/set-avatar/${username}`, {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ avatar: avatarName })
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            // Обновляем аватар на странице
+            document.getElementById("avatar").src = `/static/avatars/${avatarName}?v=` + new Date().getTime();
+            alert("Аватарка успешно изменена!");
+        } else {
+            alert(data.detail || "Ошибка при изменении аватарки.");
+        }
+    } catch (error) {
+        alert("Произошла ошибка при изменении аватарки.");
+    }
+}
+
+
+
+
+// Функция для логирования сообщений в стилизованную консоль
+function logMessage(message, type = 'info') {
+    const debugLog = document.getElementById("debug-log");
+    const timestamp = new Date().toLocaleTimeString();
+    const formattedMessage = `[${timestamp}] ${message}`;
+
+    // Проверяем, если сообщение уже есть, не добавляем его снова
+    const lastMessage = debugLog.lastElementChild;
+    if (lastMessage && lastMessage.textContent.includes(message)) {
+        return;
+    }
+
+    const messageElement = document.createElement("div");
+    messageElement.classList.add("log-message", type);
+    messageElement.innerHTML = `<span class="timestamp">${formattedMessage}</span>`;
+    debugLog.appendChild(messageElement);
+    debugLog.scrollTop = debugLog.scrollHeight; // Прокрутка вниз
+}
+
+// Вызов при загрузке страницы
+document.addEventListener("DOMContentLoaded", fetchTimers);
+
+async function fetchTimers() {
+    const username = document.getElementById("profile-username").innerText;
+    if (!username || username === "Guest") return;
+
+    try {
+        const response = await fetch(`${baseUrl}/timers/${username}`);
+        if (!response.ok) {
+            throw new Error("Не удалось получить таймеры");
+        }
+        const data = await response.json();
+
+        // Определим, на какой вкладке мы сейчас
+        const currentTab = window.currentTab || "daily";
+
+        // DAILY-анимация: только если мы на вкладке "daily" и daily>0
+        if (currentTab === "daily" && data.daily > 0) {
+            showElementById("daily-animation");
+        } else {
+            hideElementById("daily-animation");
+        }
+
+        // WORK-анимация: только если мы на вкладке "work" и work>0
+        if (currentTab === "work" && data.work > 0) {
+            showElementById("work-animation");
+        } else {
+            hideElementById("work-animation");
+        }
+
+        // Dice-анимацию мы не трогаем здесь, она не завязана на таймер.
+
+        // Запускаем визуальный отсчёт на странице (если надо)
+        startTimer(data.daily, document.getElementById("daily-timer"));
+        startTimer(data.work, document.getElementById("work-timer"));
+        startTimer(data.free_rolls, document.getElementById("free-rolls-timer"));
+    } catch (error) {
+        console.error("Ошибка получения таймеров:", error);
+    }
+}
+
+
+
+
+function startTimer(duration, display) {
+    if (duration <= 0) {
+        display.textContent = "Готово!";
+        return;
+    }
+
+    let timer = duration;
+    clearInterval(display.timerInterval);
+
+    display.timerInterval = setInterval(() => {
+        display.textContent = formatTimeRemaining(timer);
+
+        if (--timer < 0) {
+            clearInterval(display.timerInterval);
+            display.textContent = "Готово!";
+        }
+    }, 1000);
+}
+
+
+function formatTimeRemaining(seconds) {
+    // Если время вышло или нет, показываем «Готово!»
+    if (seconds <= 0) {
+        return "Готово!";
+    }
+
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (hrs > 0) {
+        // Показываем часы и минуты
+        // Пример: "2ч 15м"
+        return `${hrs}ч ${mins}м`;
+    } else if (mins > 0) {
+        // Показываем минуты и секунды
+        // Пример: "45м 30с"
+        return `${mins}м ${secs}с`;
+    } else {
+        // Меньше минуты - показываем только секунды
+        // Пример: "30с"
+        return `${secs}с`;
+    }
+}
+
+function showElementById(id) {
+    document.getElementById(id).classList.remove("hidden");
+}
+
+function hideElementById(id) {
+    document.getElementById(id).classList.add("hidden");
+}
+
+
+function showAnimation(type) {
+    // Спрячем все анимации
+    document.getElementById("daily-animation").classList.add("hidden");
+    document.getElementById("work-animation").classList.add("hidden");
+    document.getElementById("dice-animation").classList.add("hidden");
+
+    // Покажем нужную
+    if (type === "daily") {
+        document.getElementById("daily-animation").classList.remove("hidden");
+    } else if (type === "work") {
+        document.getElementById("work-animation").classList.remove("hidden");
+    } else if (type === "dice") {
+        document.getElementById("dice-animation").classList.remove("hidden");
+    }
+}
+
+function hideAllAnimations() {
+    document.getElementById("daily-animation").classList.add("hidden");
+    document.getElementById("work-animation").classList.add("hidden");
+    document.getElementById("dice-animation").classList.add("hidden");
+}
+

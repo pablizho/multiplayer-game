@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game - Multiplayer Game</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+     <!-- Боковая панель -->
+     <aside class="stats-panel">
+        <div id="profile">
+            <h2 id="profile-username">Guest</h2>
+            <img id="avatar" src="/static/avatars/default_avatar.jpg" alt="Avatar" class="avatar">
+
+        </div>
+
+        <div id="timer-display"></div>
+
+        <hr>
+        <div class="stats">
+            <p><b>Coins:</b> <span id="stat-coins">0</span></p>
+            <p><b>Rank:</b> <span id="stat-rank">---</span></p>
+            <p><b>Free Rolls:</b> <span id="stat-free-rolls">10</span></p>
+        </div>
+        <!-- Скрывающееся меню -->
+        <div id="settings-menu" class="hidden">
+            <button onclick="deleteProfile()">Delete Profile</button>
+            <button onclick="toggleAvatarSelector()">Change Avatar</button> <!-- Кнопка для выбора аватарки -->
+            
+            <!-- Компактное окно выбора аватарки -->
+            <div id="avatar-selector" class="hidden">
+                <h3>Select Avatar</h3>
+                <div class="avatar-options">
+                    <img src="/static/avatars/avatar1.jpg" alt="Avatar 1" onclick="selectAvatar('avatar1.jpg')">
+                    <img src="/static/avatars/avatar2.jpg" alt="Avatar 2" onclick="selectAvatar('avatar2.jpg')">
+                    <img src="/static/avatars/avatar3.jpg" alt="Avatar 3" onclick="selectAvatar('avatar3.jpg')">
+                </div>
+                <button onclick="toggleAvatarSelector()">Close</button>
+            </div>
+
+
+        </div>
+        <button onclick="toggleSettingsMenu()">⚙️ Settings</button>
+    </aside>
+
+    <!-- Центральная панель -->
+    <main>
+        <header>
+            <h1>🎮 Multiplayer Game</h1>
+        </header>
+        <div id="animation-area">
+    <!-- Анимация для DAILY -->
+    <div id="daily-animation" class="hidden">
+        <img src="/static/animations/coins.gif" alt="Daily Animation" />
+        <p>Daily Reward Cooldown...</p>
+    </div>
+
+    <!-- Анимация для WORK -->
+    <div id="work-animation" class="hidden">
+        <img src="/static/animations/hammer.gif" alt="Work Animation" />
+        <p>Work Cooldown...</p>
+    </div>
+
+    <!-- Анимация для DICE -->
+    <div id="dice-animation" class="hidden">
+        <img src="/static/animations/dice-roll.gif" alt="Dice Animation" />
+        <p>Rolling the dice...</p>
+    </div>
+</div>
+
+
+
+        <div id="debug-console">
+            <h3>🛠️ Debug Console</h3>
+            <div id="debug-log"></div>
+        </div>
+
+        <!-- Основное меню -->
+        <div id="tabs">
+            <div class="tabs">
+                <button class="tab-button active" onclick="showTab('daily')">
+                    💰 Daily <span id="daily-timer" class="timer"></span>
+                </button>
+                <button class="tab-button" onclick="showTab('work')">
+                    🛠️ Work <span id="work-timer" class="timer"></span>
+                </button>
+                <button class="tab-button" onclick="showTab('games')">
+                    🎲 Free Rolls <span id="free-rolls-timer" class="timer"></span>
+                </button>
+            </div>
+
+            <section id="daily" class="tab-content active">
+                <h2>💰 Daily Rewards</h2>
+                <button onclick="dailyReward()">Claim Daily Reward</button>
+            </section>
+            <section id="work" class="tab-content">
+                <h2>🛠️ Work</h2>
+                <button onclick="workReward()">Work and Earn Coins</button>
+            </section>
+            <section id="games" class="tab-content">
+                <h2>🎲 Play Dice</h2>
+                <input type="number" id="bet" placeholder="Enter your bet">
+                <button onclick="playDice()">Play</button>
+                <button onclick="buyRolls()">Buy Rolls</button>
+            </section>
+        </div>
+    </main>
+</div>
+<script src="scripts.js"></script>
+</body>
+</html>
