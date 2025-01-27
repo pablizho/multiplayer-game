@@ -101,9 +101,9 @@ function adjustLayout() {
 
         // Проверяем размеры анимации
         if (animationArea) {
-            const maxWidth = animationArea.offsetWidth;
-            animationArea.style.height = `${maxWidth * 9 / 16}px`; // Пропорция 16:9
-        }
+        const containerWidth = animationArea.offsetWidth;
+        animationArea.style.height = `${Math.max(150, containerWidth * 9 / 16)}px`; // Пропорция 16:9
+    }
 
         // Проверяем высоту нижних элементов
         adjustBottomPanel(mainPanel, containerHeight);

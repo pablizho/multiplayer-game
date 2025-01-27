@@ -154,13 +154,17 @@ header h1 {
 
 /* Исправления для области анимации */
 #animation-area {
-    height: 200px;
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 16 / 9; /* Сохраняем соотношение сторон 16:9 */
+    min-height: 150px; /* Минимальная высота */
+    max-height: 300px; /* Ограничение максимальной высоты */
     background: #1e1e2f;
     border: 2px dashed #50597b;
     border-radius: 8px;
     margin-bottom: 20px;
     position: relative;
-    overflow: hidden; /* Важное исправление */
+    overflow: hidden;
     display: flex;
     justify-content: center;
     align-items: center;
