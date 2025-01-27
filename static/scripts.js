@@ -25,8 +25,25 @@ document.addEventListener("DOMContentLoaded", () => {
     if (currentPath.includes("game.html")) {
         console.log("Находимся на странице игры. Проверка токена...");
         restoreState();
+        
+         // Добавляем пинг, чтобы сервер не засыпал
+        setInterval(() => {
+            const username = localStorage.getItem("username");
+            if (username) {
+                fetch(`${baseUrl}/timers/${username}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            console.error("Ошибка при пинге сервера.");
+                        }
+                    })
+                    .catch(error => console.error("Ошибка пинга:", error));
+            }
+        }, 300000); // Каждые 5 минут
+
         return;
     }
+
+
 
     console.log("Неизвестный путь. Перенаправление...");
     window.location.href = "register.html";
