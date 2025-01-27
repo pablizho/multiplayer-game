@@ -1,19 +1,50 @@
 /* Общий фон */
 body {
     margin: 0;
+     width: 100%;
+    height: 100%;
     font-family: 'Arial', sans-serif;
     background: linear-gradient(135deg, #1e1e2f, #343a60);
     color: #fff;
+    overflow-x: hidden; /* Убирает горизонтальную прокрутку */
 }
 
 /* Основной контейнер */
 .container {
+    width: 100%;
+    height: 100%;
     display: flex;
     flex-direction: column;
     height: 100vh;
+    width: 100vw; /* Задает ширину контейнера по экрану */
     padding: 10px;
     box-sizing: border-box;
 }
+
+/* Кнопка общего стиля */
+button {
+    display: block;
+    width: 100%;
+    max-width: 300px;
+    margin: 10px auto;
+    padding: 10px 15px;
+    background: linear-gradient(45deg, #3b3f52, #343a60);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    text-align: center;
+}
+
+button:hover {
+    background: linear-gradient(45deg, #007bff, #0056b3);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
+}
+
 
 /* Боковая панель */
 .stats-panel {
@@ -239,6 +270,13 @@ header h1 {
         gap: 20px;
     }
     
+#diceCanvas {
+    border: 4px solid #444;
+    background-color: #2a2a2a;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+    border-radius: 10px;
+}
+    
     .stats-panel {
         width: 300px;
         height: calc(100vh - 20px);
@@ -289,6 +327,8 @@ header h1 {
         margin: 0 10px 0 0;
     }
 
+
+
     .stats p {
         margin: 5px 0;
         font-size: 14px;
@@ -307,8 +347,13 @@ header h1 {
 /* Мобильная версия */
 @media (max-width: 480px) {
     .stats-panel {
-        flex-direction: column;
-        padding: 10px;
+        box-sizing: border-box;
+    width: 100%; /* Устанавливаем ширину панели равной ширине контейнера */
+    max-width: 100%; /* Запрещаем панели выходить за пределы */
+    height: auto;    
+    display: flex;
+    justify-content: center;
+    align-items: center;
     }
 
     #profile {
@@ -316,8 +361,8 @@ header h1 {
     }
 
     .avatar {
-        width: 80px;
-        height: 80px;
+        width: 100px;
+        height: 100px;
     }
 
     .stats {
@@ -325,7 +370,14 @@ header h1 {
     }
 
     #animation-area {
-        height: 120px;
+        height: 150px; /* Увеличиваем высоту */
+        width: 100%; /* Занимаем всю ширину */
+        margin: 10px 0; /* Убираем боковые отступы */
+    }
+
+    .animation-content {
+        width: 80%; /* Уменьшаем ширину анимации */
+        height: auto; /* Сохраняем пропорции */
     }
 
     .tab-button {
@@ -333,8 +385,19 @@ header h1 {
         font-size: 12px;
     }
 
+    .container {
+        padding: 5px;
+    }
+
+    
+
     .stats p {
-        font-size: 16px;
+        font-size: 12px;
+    }
+
+    button {
+        max-width: 100%;
+        font-size: 14px;
     }
 
     .action-button {

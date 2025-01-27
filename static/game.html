@@ -19,7 +19,6 @@
 
         <div id="timer-display"></div>
 
-        <hr>
         <div class="stats">
             <p><b>Coins:</b> <span id="stat-coins">0</span></p>
             <p><b>Rank:</b> <span id="stat-rank">---</span></p>
@@ -66,8 +65,9 @@
 
     <!-- Анимация для DICE -->
     <div id="dice-animation" class="hidden">
-        <img src="/static/animations/dice-roll.gif" alt="Dice Animation" />
-        <p>Rolling the dice...</p>
+       <!-- <img src="/static/animations/dice-roll.gif" alt="Dice Animation" />-->
+        <canvas id="diceCanvas" width="400" height="200"></canvas>
+        <!--<p>Rolling the dice...</p>-->
     </div>
 </div>
 

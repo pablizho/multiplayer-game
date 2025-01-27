@@ -5,6 +5,10 @@ const baseUrl = window.location.origin;
 // Вызов функции восстановления при загрузке страницы
 
 document.addEventListener("DOMContentLoaded", () => {
+
+    adjustLayout(); // Запускаем при загрузке
+    window.addEventListener("resize", adjustLayout); // Обновляем при изменении размера окна
+
     const currentPath = window.location.pathname;
 
     const token = localStorage.getItem("token");
@@ -78,7 +82,52 @@ function restoreState() {
 }
 
 
+// Функция для корректировки размеров
+function adjustLayout() {
+    const container = document.querySelector('.container');
+    const statsPanel = document.querySelector('.stats-panel');
+    const mainPanel = document.querySelector('main');
+    const animationArea = document.getElementById('animation-area');
 
+    if (container && statsPanel && mainPanel) {
+        const containerHeight = window.innerHeight;
+
+        // Устанавливаем высоту боковой панели
+        statsPanel.style.height = `${containerHeight}px`;
+
+        // Устанавливаем высоту основной панели
+        const statsPanelHeight = statsPanel.offsetHeight;
+        mainPanel.style.height = `${containerHeight}px`;
+
+        // Проверяем размеры анимации
+        if (animationArea) {
+            const maxWidth = animationArea.offsetWidth;
+            animationArea.style.height = `${maxWidth * 9 / 16}px`; // Пропорция 16:9
+        }
+
+        // Проверяем высоту нижних элементов
+        adjustBottomPanel(mainPanel, containerHeight);
+    }
+}
+
+// Исправление положения нижних элементов
+function adjustBottomPanel(mainPanel, containerHeight) {
+    const debugConsole = document.getElementById("debug-console");
+    const tabs = document.getElementById("tabs");
+
+    if (debugConsole && tabs) {
+        const debugHeight = debugConsole.offsetHeight;
+        const tabsHeight = tabs.offsetHeight;
+
+        const remainingHeight = containerHeight - (tabsHeight + debugHeight);
+
+        if (remainingHeight > 0) {
+            mainPanel.style.paddingBottom = `${remainingHeight}px`; // Добавляем отступы снизу
+        } else {
+            mainPanel.style.paddingBottom = "0px"; // Убираем отступы, если места достаточно
+        }
+    }
+}
 
 
 
@@ -219,6 +268,8 @@ async function workReward() {
 }
 
 
+let diceAnimationInterval = null; // Храним ID интервала для анимации
+
 // Бросить кубик
 async function playDice() {
     const username = document.getElementById("profile-username").innerText;
@@ -234,48 +285,74 @@ async function playDice() {
         return;
     }
 
-    // Показываем анимацию броска
+    const canvas = document.getElementById('diceCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const diceWidth = canvas.width / 2 - 30;
+    const diceHeight = canvas.height - 20;
+
+    function drawDice(x, y, value) {
+        const img = new Image();
+        img.src = `/static/images/dice/dice-${value}.png`;
+        img.onload = () => {
+            ctx.drawImage(img, x, y, diceWidth, diceHeight);
+        };
+    }
+
     showElementById("dice-animation");
 
+    // Анимация случайных значений
+    let interval = setInterval(() => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const random1 = Math.floor(Math.random() * 6) + 1;
+        const random2 = Math.floor(Math.random() * 6) + 1;
+        drawDice(20, 10, random1);
+        drawDice(diceWidth + 40, 10, random2);
+    }, 100);
+
     try {
+        // Запрос к серверу
         const response = await fetch(`${baseUrl}/games/dice/${username}?bet=${bet}`, {
-          headers: {
-            "Authorization": "Bearer " + localStorage.getItem("token")
-        }
-    });
+            headers: { "Authorization": "Bearer " + localStorage.getItem("token") }
+        });
+
         if (!response.ok) {
             const errorData = await response.json();
             logMessage(errorData.detail || "Ошибка при броске кубика", "error");
+            clearInterval(interval);
+            hideElementById("dice-animation");
             return;
         }
+
         const data = await response.json();
+        const [dice1, dice2] = data.dice;
 
-        // Обновляем монеты, логи
-        if (data.total_coins !== undefined) {
-            document.getElementById("stat-coins").textContent = data.total_coins;
-        }
-        if (data.free_rolls !== undefined) {
-            document.getElementById("stat-free-rolls").textContent = data.free_rolls;
-        }
-        if (data.winnings < 0) {
-            logMessage(data.message, "error");
-        } else {
-            logMessage(data.message, "success");
-        }
-
-        // Даём анимации покрутиться ещё 2 секунды, потом скрываем
+        // Показать реальные результаты
         setTimeout(() => {
-            hideElementById("dice-animation");
-        }, 2000);
+            clearInterval(interval); // Останавливаем анимацию
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawDice(20, 10, dice1); // Первый кубик
+            drawDice(diceWidth + 40, 10, dice2); // Второй кубик
 
+            // Логируем реальный результат
+            logMessage(
+                `Вы бросили кости [${dice1}, ${dice2}]. Ставка: ${bet} монет: ${data.message}`,
+                data.winnings >= 0 ? "success" : "error"
+            );
+
+            // Обновляем статистику
+            document.getElementById("stat-coins").textContent = data.total_coins;
+            document.getElementById("stat-free-rolls").textContent = data.free_rolls;
+
+            // Скрываем анимацию через 2 секунды
+            setTimeout(() => {
+                hideElementById("dice-animation");
+            }, 2000);
+        }, 1500); // Даем время для завершения анимации
     } catch (error) {
         logMessage(`Ошибка: ${error.message}`, "error");
-        // Если запрос упал, можно тоже скрыть анимацию сразу
+        clearInterval(interval);
         hideElementById("dice-animation");
-    } finally {
-        // Здесь можно ещё раз вызвать fetchTimers(),
-        // если хотите обновить счётчик free_rolls
-        fetchTimers();
     }
 }
 
