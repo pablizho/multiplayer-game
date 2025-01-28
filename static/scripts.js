@@ -534,25 +534,34 @@ function restoreLogs() {
 // функции для управления меню:
 function toggleSettingsMenu() {
     const settingsMenu = document.getElementById("settings-menu");
-    settingsMenu.classList.toggle("active"); // Переключаем видимость меню
+    const avatarMenu = document.getElementById("avatar-selector");
+
+    if (settingsMenu) {
+        settingsMenu.classList.toggle("active");
+
+        // Скрываем окно выбора аватарок при открытии настроек
+        if (avatarMenu && settingsMenu.classList.contains("active")) {
+            avatarMenu.classList.add("hidden");
+            avatarMenu.style.display = "none"; // Принудительно скрываем
+        }
+    }
 }
 
-
-// Открыть модальное окно для выбора аватарки
-function openAvatarSelector() {
-    document.getElementById("avatar-selector-modal").classList.remove("hidden");
-}
-
-// Закрыть модальное окно
-function closeAvatarSelector() {
-    document.getElementById("avatar-selector-modal").classList.add("hidden");
-}
-
-// Открыть селектор аватарок
 function toggleAvatarSelector() {
-    const avatarSelector = document.getElementById("avatar-selector");
-    avatarSelector.classList.toggle("hidden");
+    const avatarMenu = document.getElementById("avatar-selector");
+    if (avatarMenu) {
+        if (avatarMenu.classList.contains("hidden")) {
+            avatarMenu.style.display = ""; // Сбрасываем стиль
+            avatarMenu.classList.remove("hidden");
+        } else {
+            avatarMenu.style.display = "none"; // Принудительно скрываем
+            avatarMenu.classList.add("hidden");
+        }
+        console.log("Current display style:", getComputedStyle(avatarMenu).display);
+    }
 }
+
+
 
 // Выбрать аватарку
 async function selectAvatar(avatarName) {
