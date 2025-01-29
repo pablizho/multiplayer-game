@@ -74,6 +74,10 @@ document.addEventListener("DOMContentLoaded", () => {
     window.location.href = "register.html";
 });
 
+function applyBet() {
+    document.getElementById("bet").blur(); // Закрывает клавиатуру
+}
+
 // Открытие модального окна
 function openModal() {
     console.log("🔹 Открытие модального окна...");
