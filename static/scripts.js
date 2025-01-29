@@ -435,17 +435,16 @@ async function playDice() {
 
     const canvas = document.getElementById('diceCanvas');
     const ctx = canvas.getContext('2d');
+const diceWidth = canvas.width / 2;  // Половина ширины canvas
+    const diceHeight = canvas.height;    // Полная высота canvas
 
-    const diceWidth = canvas.width / 2 - 30;
-    const diceHeight = canvas.height - 20;
-
-    function drawDice(x, y, value) {
-        const img = new Image();
-        img.src = `/static/images/dice/dice-${value}.png`;
-        img.onload = () => {
-            ctx.drawImage(img, x, y, diceWidth, diceHeight);
-        };
-    }
+   function drawDice(x, y, width, height, value) {
+    const img = new Image();
+    img.src = `/static/images/dice/dice-${value}.png`;
+    img.onload = () => {
+        ctx.drawImage(img, x, y, width, height);
+    };
+}
 
     showElementById("dice-animation");
 
@@ -454,8 +453,11 @@ async function playDice() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         const random1 = Math.floor(Math.random() * 6) + 1;
         const random2 = Math.floor(Math.random() * 6) + 1;
-        drawDice(20, 10, random1);
-        drawDice(diceWidth + 40, 10, random2);
+        const diceWidth = canvas.width / 2; // Половина ширины canvas
+    const diceHeight = canvas.height;  // Полная высота canvas
+
+    drawDice(0, 0, diceWidth, diceHeight, random1);  // Левый кубик
+    drawDice(diceWidth, 0, diceWidth, diceHeight, random2); // Правый кубик
     }, 100);
 
     try {
@@ -466,9 +468,10 @@ async function playDice() {
 
         if (!response.ok) {
             const errorData = await response.json();
-            showModal(errorData.detail || "Ошибка при броске кубика", "error");
+            showModal(errorData.detail || "Ошибка при броске кубика", () => {
+                hideElementById("dice-animation"); // Кубики пропадают только после нажатия кнопки
+            });
             clearInterval(interval);
-            hideElementById("dice-animation");
             return;
         }
 
@@ -479,29 +482,28 @@ async function playDice() {
         setTimeout(() => {
             clearInterval(interval); // Останавливаем анимацию
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            drawDice(20, 10, dice1); // Первый кубик
-            drawDice(diceWidth + 40, 10, dice2); // Второй кубик
+            drawDice(0, 0, canvas.width / 2, canvas.height, dice1);  // Левый кубик
+    drawDice(canvas.width / 2, 0, canvas.width / 2, canvas.height, dice2); // Правый кубик
 
             // Логируем реальный результат
             console.log("Ответ сервера:", data);
-            showModal(
-    data.message, 
-    data.winnings >= 0 ? "success" : "error"
-);
+             // Модальное окно теперь ждет нажатия кнопки, перед тем как спрятать кубики
+            showModal(data.message, () => {
+                hideElementById("dice-animation"); // Кубики пропадают только после нажатия "ОК" или "Отмена"
+            });
+
+            
 
             // Обновляем статистику
             document.getElementById("stat-coins").textContent = data.total_coins;
             document.getElementById("stat-free-rolls").textContent = data.free_rolls;
 
-            // Скрываем анимацию через 2 секунды
-            setTimeout(() => {
-                hideElementById("dice-animation");
-            }, 2000);
-        }, 1500); // Даем время для завершения анимации
+             }, 1500); // Даем время на завершение анимации
     } catch (error) {
-        showModal(`Ошибка: ${error.message}`, "error");
+        showModal(`Ошибка: ${error.message}`, () => {
+            hideElementById("dice-animation"); // Кубики исчезнут после закрытия окна
+        });
         clearInterval(interval);
-        hideElementById("dice-animation");
     }
 }
 
