@@ -179,6 +179,8 @@ function restoreState() {
             localStorage.setItem("username", data.username);
             updateProfile(data.username, data);
             // Если мы уже на game.html, остаемся здесь
+             // Приветственное уведомление
+            showNotification(`Добро пожаловать, ${data.username}! 🎉`, "success");
             if (!window.location.pathname.includes("game.html")) {
                 window.location.href = "game.html";
             }
@@ -237,6 +239,27 @@ function adjustBottomPanel(mainPanel, containerHeight) {
         }
     }
 }
+
+function showNotification(message, type = "info", duration = 3000) {
+    const container = document.getElementById("notification-container");
+
+    const notification = document.createElement("div");
+    notification.classList.add("notification", type, "show");
+
+    notification.innerHTML = `
+        <span>${message}</span>
+        <button class="close-btn" onclick="this.parentElement.classList.add('hide')">&times;</button>
+    `;
+
+    container.appendChild(notification);
+
+    // Автоматическое скрытие
+    setTimeout(() => {
+        notification.classList.add("hide");
+        setTimeout(() => notification.remove(), 400); // Удаляем после анимации
+    }, duration);
+}
+
 
 
 
@@ -316,7 +339,7 @@ function switchToMainInterface() {
 async function dailyReward() {
     const username = document.getElementById("profile-username").innerText;
     if (!username || username === "Guest") {
-        logMessage("Пожалуйста, зарегистрируйтесь!", "error");
+        showModal("Пожалуйста, зарегистрируйтесь!", "error");
         return;
     }
 
@@ -333,9 +356,9 @@ async function dailyReward() {
         if (data.total_coins) {
             document.getElementById("stat-coins").innerText = data.total_coins;
         }
-        logMessage(data.message, "success");
+        showModal(data.message, "success");
     } catch (error) {
-        logMessage(`Ошибка при получении ежедневной награды: ${error}`, "error");
+        showModal(`Ошибка при получении ежедневной награды: ${error}`, "error");
     } finally {
         // НЕ вызываем hideAllAnimations() здесь!
         // Вместо этого обновим таймеры — они сами решат,
@@ -349,7 +372,7 @@ async function dailyReward() {
 async function workReward() {
     const username = document.getElementById("profile-username").innerText;
     if (!username || username === "Guest") {
-        logMessage("Пожалуйста, зарегистрируйтесь!", "error");
+        showModal("Пожалуйста, зарегистрируйтесь!", "error");
         return;
     }
 
@@ -366,9 +389,9 @@ async function workReward() {
         if (data.total_coins) {
             document.getElementById("stat-coins").innerText = data.total_coins;
         }
-        logMessage(data.message, "success");
+        showModal(data.message, "success");
     } catch (error) {
-        logMessage(`Ошибка при работе: ${error}`, "error");
+        showModal(`Ошибка при работе: ${error}`, "error");
     } finally {
         // НЕ скрываем анимацию вручную,
         // а даём fetchTimers() показать или спрятать «work-animation»
@@ -386,11 +409,11 @@ async function playDice() {
     const bet = betInput ? parseInt(betInput, 10) : 0;
 
     if (!username || username === "Guest") {
-        logMessage("Пожалуйста, зарегистрируйтесь!", "error");
+        showModal("Пожалуйста, зарегистрируйтесь!", "error");
         return;
     }
     if (bet <= 0) {
-        logMessage("Ставка должна быть больше 0.", "error");
+        showModal("Ставка должна быть больше 0.", "error");
         return;
     }
 
@@ -427,7 +450,7 @@ async function playDice() {
 
         if (!response.ok) {
             const errorData = await response.json();
-            logMessage(errorData.detail || "Ошибка при броске кубика", "error");
+            showModal(errorData.detail || "Ошибка при броске кубика", "error");
             clearInterval(interval);
             hideElementById("dice-animation");
             return;
@@ -444,10 +467,11 @@ async function playDice() {
             drawDice(diceWidth + 40, 10, dice2); // Второй кубик
 
             // Логируем реальный результат
-            logMessage(
-                `Вы бросили кости [${dice1}, ${dice2}]. Ставка: ${bet} монет: ${data.message}`,
-                data.winnings >= 0 ? "success" : "error"
-            );
+            console.log("Ответ сервера:", data);
+            showModal(
+    data.message, 
+    data.winnings >= 0 ? "success" : "error"
+);
 
             // Обновляем статистику
             document.getElementById("stat-coins").textContent = data.total_coins;
@@ -459,7 +483,7 @@ async function playDice() {
             }, 2000);
         }, 1500); // Даем время для завершения анимации
     } catch (error) {
-        logMessage(`Ошибка: ${error.message}`, "error");
+        showModal(`Ошибка: ${error.message}`, "error");
         clearInterval(interval);
         hideElementById("dice-animation");
     }

@@ -5,6 +5,10 @@
     box-sizing: border-box;
 }
 
+#debug-console {
+    display: none;
+}
+
 body {
     font-family: 'Segoe UI', sans-serif;
     background: #1a1a2e;
@@ -370,10 +374,11 @@ input[type="number"]:focus {
 
 /* Таймеры */
 .timer {
-    font-size: 0.9rem;
+    font-size: 0.75rem; /* Уменьшение размера текста */
     font-weight: bold;
-    color: #ffcc70; /* Мягкий желто-оранжевый */
-    margin-left: 0.5rem;
+    color: #ffcc70;
+    margin-left: 0.3rem;
+    white-space: nowrap; /* Запрет переноса текста */
 }
 
 
@@ -508,6 +513,71 @@ input[type="number"]:focus {
     display: none;
 }
 
+
+/* Контейнер для уведомлений */
+#notification-container {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 5000;
+    pointer-events: none; /* Отключаем кликабельность контейнера */
+}
+
+/* Базовый стиль уведомлений */
+.notification {
+    background: rgba(45, 45, 65, 0.98); /* Темный фон, гармонирующий с UI */
+    color: #e0e0e0;
+    padding: 12px 16px;
+    border-radius: 8px;
+    min-width: 230px;
+    max-width: 280px;
+    font-size: 0.92rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+    opacity: 1;
+    transform: translateX(100%);
+    transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+    pointer-events: auto; /* Разрешаем кликать */
+    font-weight: 500;
+}
+
+/* Анимация появления */
+.notification.show {
+    transform: translateX(0);
+}
+
+/* Анимация исчезновения */
+.notification.hide {
+    opacity: 0;
+    transform: translateX(100%);
+}
+
+/* Цветовые вариации */
+.notification.success { background: rgba(75, 150, 100, 0.95); color: #d6f8e5; }
+.notification.error { background: rgba(200, 60, 85, 0.95); color: #ffdde1; }
+.notification.info { background: rgba(50, 120, 200, 0.95); color: #dbe7ff; }
+
+/* Кнопка закрытия */
+.notification .close-btn {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 1.1rem;
+    cursor: pointer;
+    margin-left: 12px;
+    transition: color 0.2s, transform 0.2s;
+}
+
+.notification .close-btn:hover {
+    color: #ffcc70;
+    transform: scale(1.2);
+}
+
 /* Адаптивный дизайн */
 @media (max-width: 768px) {
     .container {
@@ -515,6 +585,23 @@ input[type="number"]:focus {
         padding: 0.5rem;
         min-height: 100vh;
         
+    }
+
+    #notification-container {
+        top: 8px;
+        right: 8px;
+        gap: 8px;
+    }
+
+    .notification {
+        min-width: 200px;
+        max-width: 250px;
+        font-size: 0.85rem;
+        padding: 10px 14px;
+    }
+
+    .notification .close-btn {
+        font-size: 1rem;
     }
 
     .stats-panel {
@@ -542,6 +629,50 @@ input[type="number"]:focus {
          max-height: 200px; /* Ограничиваем размер */
     }
 
+    /* Группируем кнопки Daily и Work в одной строке */
+.timer-buttons {
+    display: flex;
+    justify-content: space-between;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.timer-buttons .tab-button {
+    flex: 1;
+    padding: 0.6rem;
+    font-size: 0.8rem;
+    border-radius: 0.4rem;
+    background: #533483;
+    color: white;
+    font-weight: bold;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.timer-buttons .tab-button:hover {
+    background: #e94560;
+    transform: translateY(-2px);
+}
+
+/* Кнопка Free Rolls */
+.free-rolls-button {
+    width: 100%;
+    padding: 0.8rem;
+    font-size: 0.9rem;
+    border-radius: 0.5rem;
+    background: #e94560;
+    color: white;
+    font-weight: bold;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.free-rolls-button:hover {
+    background: #ff4d6d;
+    transform: translateY(-2px);
+}
+
+
     .avatar {
         width: 80px;
         height: 80px;
@@ -554,6 +685,8 @@ input[type="number"]:focus {
     #debug-log {
         height: 100px;
     }
+
+
 }
 
 /* Стили для планшетов */
@@ -641,6 +774,22 @@ input[type="number"]:focus {
         width: 100%;
         max-width: 400px;
     }
+
+ .timer-buttons {
+        display: flex;
+        justify-content: center; /* Центрирование кнопок */
+        gap: 10px;
+        width: fit-content; /* Подстраиваем ширину под содержимое */
+        margin: 0 auto; /* Центрируем блок */
+    }
+
+    .timer-buttons .tab-button {
+        flex: none; /* Убираем автоматическое растяжение */
+        min-width: 110px; /* Минимальная ширина кнопки */
+        padding: 0.6rem 1rem; /* Подгоняем размер */
+        font-size: 0.85rem;
+    }
+
 
     /* Консоль (поднимаем вверх, делаем аккуратнее) */
     #debug-console {

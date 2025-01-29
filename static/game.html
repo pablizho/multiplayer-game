@@ -8,53 +8,54 @@
 </head>
 <body>
 
-<!-- Кастомное модальное окно -->
-<div id="custom-modal" class="modal hidden">
-    <div class="modal-content">
-        <p id="modal-message">Сколько бросков вы хотите купить? (1 бросок = 10 монет)</p>
-<input type="number" id="modal-input" min="1" placeholder="Введите количество">
-        <div class="modal-buttons">
-            <button id="modal-confirm">OK</button>
-            <button id="modal-cancel">Отмена</button>
+
+    <!-- Кастомное модальное окно -->
+    <div id="custom-modal" class="modal hidden">
+        <div class="modal-content">
+            <p id="modal-message">Сколько бросков вы хотите купить? (1 бросок = 10 монет)</p>
+            <input type="number" id="modal-input" min="1" placeholder="Введите количество">
+            <div class="modal-buttons">
+                <button id="modal-confirm">OK</button>
+                <button id="modal-cancel">Отмена</button>
+            </div>
         </div>
     </div>
-</div>
 
     
     <div class="container">
         <!-- Кнопка для открытия меню -->
-    <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+        <button class="menu-toggle" onclick="toggleMenu()">☰</button>
 
-<!-- Боковая панель -->
-<aside id="stats-panel" class="stats-panel" style="display: none;">
-    <div id="profile-settings-container">
-        <div id="profile">
-            <h2 id="profile-username">Guest</h2>
-            <img id="avatar" src="/static/avatars/default_avatar.jpg" alt="Avatar" class="avatar">
-        </div>
-        <div id="timer-display"></div>
-        <div class="stats">
-            <p><b>Coins:</b> <span id="stat-coins">0</span></p>
-            <p><b>Rank:</b> <span id="stat-rank">---</span></p>
-            <p><b>Free Rolls:</b> <span id="stat-free-rolls">10</span></p>
-        </div>
-        <button onclick="toggleSettingsMenu()">⚙️</button>
-        <div id="settings-menu" class="compact-menu hidden">
-            <button onclick="deleteProfile()">🗑️</button>
-            <button onclick="toggleAvatarSelector()">🎭</button>
-            <div id="avatar-selector" class="avatar-menu hidden">
-                <div class="avatar-scroll">
-                    <img src="/static/avatars/avatar1.jpg" alt="Avatar 1" onclick="selectAvatar('avatar1.jpg')">
-                    <img src="/static/avatars/avatar2.jpg" alt="Avatar 2" onclick="selectAvatar('avatar2.jpg')">
-                    <img src="/static/avatars/avatar3.jpg" alt="Avatar 3" onclick="selectAvatar('avatar3.jpg')">
+        <!-- Боковая панель -->
+        <aside id="stats-panel" class="stats-panel" style="display: none;">
+            <div id="profile-settings-container">
+                <div id="profile">
+                    <h2 id="profile-username">Guest</h2>
+                    <img id="avatar" src="/static/avatars/default_avatar.jpg" alt="Avatar" class="avatar">
                 </div>
-                <button onclick="toggleAvatarSelector()">✖️</button>
+                <div id="timer-display"></div>
+                <div class="stats">
+                    <p><b>Coins:</b> <span id="stat-coins">0</span></p>
+                    <p><b>Rank:</b> <span id="stat-rank">---</span></p>
+                    <p><b>Free Rolls:</b> <span id="stat-free-rolls">10</span></p>
+                </div>
+                <button onclick="toggleSettingsMenu()">⚙️</button>
+                <div id="settings-menu" class="compact-menu hidden">
+                    <button onclick="deleteProfile()">🗑️</button>
+                    <button onclick="toggleAvatarSelector()">🎭</button>
+                    <div id="avatar-selector" class="avatar-menu hidden">
+                        <div class="avatar-scroll">
+                            <img src="/static/avatars/avatar1.jpg" alt="Avatar 1" onclick="selectAvatar('avatar1.jpg')">
+                            <img src="/static/avatars/avatar2.jpg" alt="Avatar 2" onclick="selectAvatar('avatar2.jpg')">
+                            <img src="/static/avatars/avatar3.jpg" alt="Avatar 3" onclick="selectAvatar('avatar3.jpg')">
+                        </div>
+                        <button onclick="toggleAvatarSelector()">✖️</button>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
-</aside>
+        </aside>
 
-
+<div id="notification-container"></div>
         <!-- Центральная панель -->
         <main>
             <header>
@@ -75,25 +76,29 @@
             </div>
             <div id="tabs">
                 <div class="tabs">
-                    <button class="tab-button active" onclick="showTab('daily')">💰 Daily <span id="daily-timer" class="timer"></span></button>
-                    <button class="tab-button" onclick="showTab('work')">🛠️ Work <span id="work-timer" class="timer"></span></button>
-                    <button class="tab-button" onclick="showTab('games')">🎲 Free Rolls <span id="free-rolls-timer" class="timer"></span></button>
-                </div>
-                <section id="daily" class="tab-content active">
-                    <h2>💰 Daily Rewards</h2>
-                    <button onclick="dailyReward()">Claim Daily Reward</button>
-                </section>
-                <section id="work" class="tab-content">
-                    <h2>🛠️ Work</h2>
-                    <button onclick="workReward()">Work and Earn Coins</button>
-                </section>
-                <section id="games" class="tab-content">
-                    <h2>🎲 Play Dice</h2>
-                    <input type="number" id="bet" placeholder="Enter your bet">
-                    <button class="action-button" onclick="playDice()">🎲 Play</button>
-                    <button class="action-button" onclick="buyRolls()">🛒 Buy Rolls</button>
-                </section>
+    <div class="timer-buttons">
+        <button class="tab-button active" onclick="showTab('daily')">💰 Daily <span id="daily-timer" class="timer"></span></button>
+        <button class="tab-button" onclick="showTab('work')">🛠️ Work <span id="work-timer" class="timer"></span></button>
+        <button class="tab-button" onclick="showTab('games')">🎲 Free Rolls <span id="free-rolls-timer" class="timer"></span></button>
+    </div>
+</div>
+            <section id="daily" class="tab-content active">
+    <h2>💰 Daily Rewards</h2>
+    <button onclick="dailyReward()">Claim Daily Reward</button>
+</section>
+<section id="work" class="tab-content">
+    <h2>🛠️ Work</h2>
+    <button onclick="workReward()">Work and Earn Coins</button>
+</section>
+<section id="games" class="tab-content">
+    <h2>🎲 Play Dice</h2>
+    <input type="number" id="bet" placeholder="Enter your bet">
+    <button class="action-button" onclick="playDice()">🎲 Play</button>
+    <button class="action-button" onclick="buyRolls()">🛒 Buy Rolls</button>
+</section>
             </div>
+
+
             <div id="debug-console">
                 <h3>🛠️ Debug Console</h3>
                 <div id="debug-log"></div>
