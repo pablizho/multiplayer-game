@@ -31,6 +31,18 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("❌ Кнопка #modal-register не найдена!");
     }
 
+
+     const betInput = document.getElementById("bet");
+
+    if (betInput) {
+        betInput.addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                this.blur(); // Убирает фокус с поля, закрывая клавиатуру
+            }
+        });
+    }
+
     adjustLayout();
     window.addEventListener("resize", adjustLayout);
 
