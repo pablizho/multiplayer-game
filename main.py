@@ -45,8 +45,9 @@ if not os.path.exists(AVATARS_DIR):
 
 # Настройка базы данных
 Base = declarative_base()
-DATABASE_URL = "sqlite:///./game.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://mygame_5kxz_user:4GjzOvjoupqEq00BeMRHORX0NdzxZ5Rm@dpg-cud2f0t2ng1s73bbfm20-a.oregon-postgres.render.com/mygame_5kxz")
+print(f"Подключение к базе данных: {DATABASE_URL}")
+engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Модель игрока
