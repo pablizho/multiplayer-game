@@ -3,26 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register - Multiplayer Game</title>
+    <title>Регистрация - Multiplayer Game</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <main>
-            <header>
-                <h1>🎮 Multiplayer Game</h1>
-            </header>
-            <div id="animation-area">
-                <h2>Welcome to Multiplayer Game</h2>
-            </div>
-            <div id="registration">
-                <h2>🚀 Register</h2>
-                <p>Please enter your username to begin:</p>
-                <input type="text" id="username" placeholder="Enter your username">
-                <button onclick="register()">Register</button>
-            </div>
-        </main>
+
+<!-- Модальное окно для регистрации -->
+<div id="register-modal" class="modal hidden">
+    <div class="modal-content">
+        <h2>Регистрация</h2>
+        <div id="error-message" class="hidden">Введите имя пользователя и пароль!</div>
+        <label for="modal-username">Имя пользователя:</label>
+        <input type="text" id="modal-username" placeholder="Введите имя">
+
+        <label for="modal-password">Пароль:</label>
+        <input type="password" id="modal-password" placeholder="Введите пароль">
+
+        <div class="modal-buttons">
+            <button id="modal-register">Зарегистрироваться</button>
+            <button id="modal-cancel">Отмена</button>
+        </div>
     </div>
-    <script src="scripts.js" defer></script>
+</div>
+
+<div class="container">
+    <main>
+        <header>
+            <h1>🎮 Multiplayer Game</h1>
+        </header>
+        <div id="registration">
+            <h2>🚀 Регистрация</h2>
+            <p>Для начала введите данные:</p>
+            <button id="open-register-modal">Зарегистрироваться</button>
+        </div>
+    </main>
+</div>
+
+<script src="scripts.js" defer></script>
 </body>
 </html>

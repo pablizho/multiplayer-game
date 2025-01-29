@@ -9,17 +9,58 @@ body {
     font-family: 'Segoe UI', sans-serif;
     background: #1a1a2e;
     color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh; /* Заменяем height: 100vh на min-height */
+    padding: 20px; /* Чтобы контент не прилипал к краям на мобильных */
+}
+
+/* Контейнер (адаптивность) */
+.container {
+    background: #16213e;
+    padding: 2rem;
+    border-radius: 1rem;
+    box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    width: 100%;
+    max-width: 450px; /* Добавляем max-width вместо фиксированного 350px */
     min-height: 100vh;
 }
 
-/* Контейнер */
-.container {
-    display: flex;
-    min-height: 100vh;
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 1rem;
-    gap: 1rem;
+h1 {
+    color: #e94560;
+    font-size: 1.8rem;
+}
+
+h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+p {
+    margin-bottom: 1rem;
+}
+
+
+/* Кнопка регистрации */
+button {
+    background: #533483;
+    color: white;
+    border: none;
+    padding: 0.8rem 1.2rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+    width: 100%;
+    margin: 0.5rem 0;
+    font-weight: bold; /* Делаем текст чуть жирнее */
+}
+
+button:hover {
+    background: #e94560;
+    transform: translateY(-2px);
 }
 
 /* Кнопка меню */
@@ -331,9 +372,10 @@ input[type="number"]:focus {
 .timer {
     font-size: 0.9rem;
     font-weight: bold;
-    color: #e94560; /* Красный, но можно заменить на другой */
+    color: #ffcc70; /* Мягкий желто-оранжевый */
     margin-left: 0.5rem;
 }
+
 
 
 /* Сообщения лога */
@@ -354,11 +396,125 @@ input[type="number"]:focus {
     color: #2196F3;
 }
 
+/* Стили для модального окна */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 3000;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: #16213e;
+    padding: 1.5rem;
+    border-radius: 0.8rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    width: 300px;
+    max-width: 90%;
+}
+
+.modal input {
+    width: 100%;
+    padding: 0.6rem;
+    margin-bottom: 1rem;
+    border: 2px solid #533483;
+    border-radius: 0.5rem;
+    background: #1a1a2e;
+    color: white;
+    font-size: 1rem;
+    text-align: center;
+}
+
+.modal input:focus {
+    border-color: #e94560;
+    outline: none;
+}
+
+.modal p {
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    color: #fff;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.modal-buttons button {
+     background: #533483;
+    color: white;
+    border: none;
+    padding: 0.8rem 1.2rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+    min-width: auto;
+    white-space: nowrap; /* Запрещаем перенос текста */
+    overflow: visible; /* Разрешаем расширение */
+    text-overflow: clip; /* Обрезка текста, если что */
+    padding: 0.8rem;
+    font-size: 1rem;
+}
+
+.modal-buttons button:hover {
+    background: #e94560;
+}
+
+.modal input[type="number"] {
+    width: 100%;
+    padding: 0.6rem;
+    margin-bottom: 1rem;
+    border: 2px solid #533483;
+    border-radius: 0.5rem;
+    background: #1a1a2e;
+    color: white;
+    font-size: 1rem;
+    text-align: center;
+}
+
+.modal input[type="number"]:focus {
+    border-color: #e94560;
+    outline: none;
+}
+
+
+#error-message {
+    color: #e94560;
+    background: rgba(233, 69, 96, 0.2);
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    text-align: center;
+    font-size: 0.9rem;
+    width: 100%;
+    max-width: 300px; /* Ограничение ширины */
+    margin: 0 auto 1rem auto; /* Центрирование внутри формы */
+}
+.hidden {
+    display: none;
+}
+
 /* Адаптивный дизайн */
 @media (max-width: 768px) {
     .container {
         flex-direction: column;
         padding: 0.5rem;
+        min-height: 100vh;
+        
     }
 
     .stats-panel {
@@ -403,7 +559,13 @@ input[type="number"]:focus {
 /* Стили для планшетов */
 @media (min-width: 769px) and (max-width: 1024px) {
     .container {
-        padding: 0.75rem;
+        max-width: 600px;
+        padding: 2.5rem;
+    }
+
+    .tab-button {
+        font-size: 1rem;
+        padding: 1rem;
     }
 
     .stats-panel {
@@ -413,5 +575,84 @@ input[type="number"]:focus {
     .avatar {
         width: 100px;
         height: 100px;
+    }
+}
+
+
+/* Для десктопов 1024px и больше */
+@media (min-width: 1024px) {
+    /* Контейнер */
+    .container {
+        max-width: 900px;
+        width: 90%;
+        padding: 2rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Анимация (увеличена) */
+    #animation-area {
+        width: 100%;
+        max-width: 700px;
+        min-height: 250px;
+        max-height: 350px;
+        margin: 0 auto 1rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #1a1a2e;
+        border-radius: 10px;
+        padding: 1rem;
+    }
+
+    /* Вкладки */
+    .tabs {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        max-width: 100%;
+    }
+
+    .tab-button {
+        flex: 1;
+        max-width: 30%;
+        min-width: 200px;
+        font-size: 1rem;
+        padding: 1rem;
+        text-align: center;
+    }
+
+    /* Центрирование кнопок */
+    .tab-button, .tab-content {
+        text-align: center;
+    }
+
+    /* Контент вкладок */
+    .tab-content {
+        width: 100%;
+        max-width: 700px;
+        margin: 0 auto;
+    }
+
+    /* Кнопка Daily Reward */
+    .tab-content button {
+        width: 100%;
+        max-width: 400px;
+    }
+
+    /* Консоль (поднимаем вверх, делаем аккуратнее) */
+    #debug-console {
+        width: 100%;
+        max-width: 750px;
+        padding: 1rem;
+        margin-top: 1rem;
+        text-align: left;
+    }
+
+    #debug-log {
+        height: 150px;
+        font-size: 0.9rem;
     }
 }

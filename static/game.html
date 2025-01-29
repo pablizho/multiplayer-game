@@ -7,6 +7,20 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+
+<!-- Кастомное модальное окно -->
+<div id="custom-modal" class="modal hidden">
+    <div class="modal-content">
+        <p id="modal-message">Сколько бросков вы хотите купить? (1 бросок = 10 монет)</p>
+<input type="number" id="modal-input" min="1" placeholder="Введите количество">
+        <div class="modal-buttons">
+            <button id="modal-confirm">OK</button>
+            <button id="modal-cancel">Отмена</button>
+        </div>
+    </div>
+</div>
+
+    
     <div class="container">
         <!-- Кнопка для открытия меню -->
     <button class="menu-toggle" onclick="toggleMenu()">☰</button>

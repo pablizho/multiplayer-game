@@ -5,9 +5,36 @@ const baseUrl = window.location.origin;
 // Вызов функции восстановления при загрузке страницы
 
 document.addEventListener("DOMContentLoaded", () => {
+     console.log("✅ DOM загружен, назначаем обработчики...");
 
-    adjustLayout(); // Запускаем при загрузке
-    window.addEventListener("resize", adjustLayout); // Обновляем при изменении размера окна
+     // Настраиваем кнопку открытия модального окна
+    const openModalBtn = document.getElementById("open-register-modal");
+    if (openModalBtn) {
+        openModalBtn.addEventListener("click", openModal);
+    } else {
+        console.error("❌ Кнопка #open-register-modal не найдена!");
+    }
+
+    // Настраиваем кнопку отмены
+    const cancelModalBtn = document.getElementById("modal-cancel");
+    if (cancelModalBtn) {
+        cancelModalBtn.addEventListener("click", closeModal);
+    } else {
+        console.error("❌ Кнопка #modal-cancel не найдена!");
+    }
+
+    // Настраиваем кнопку регистрации
+    const registerBtn = document.getElementById("modal-register");
+    if (registerBtn) {
+        registerBtn.addEventListener("click", handleRegister);
+    } else {
+        console.error("❌ Кнопка #modal-register не найдена!");
+    }
+
+    adjustLayout();
+    window.addEventListener("resize", adjustLayout);
+
+    checkAuth();
 
     const currentPath = window.location.pathname;
 
@@ -31,14 +58,96 @@ document.addEventListener("DOMContentLoaded", () => {
         restoreState();
         return;
     }
-
-    
-
     console.log("Неизвестный путь. Перенаправление...");
     window.location.href = "register.html";
 });
 
+// Открытие модального окна
+function openModal() {
+    console.log("🔹 Открытие модального окна...");
+    const modal = document.getElementById("register-modal");
+    if (modal) {
+        modal.classList.remove("hidden");
+    } else {
+        console.error("❌ #register-modal не найден!");
+    }
+}
 
+// Закрытие модального окна
+function closeModal() {
+    console.log("🔹 Закрытие модального окна...");
+    const modal = document.getElementById("register-modal");
+    if (modal) {
+        modal.classList.add("hidden");
+    } else {
+        console.error("❌ #register-modal не найден!");
+    }
+}
+
+function showError(message) {
+    const errorMsg = document.getElementById("error-message");
+    errorMsg.textContent = message;
+    errorMsg.classList.remove("hidden");
+    setTimeout(() => errorMsg.classList.add("hidden"), 3000);
+}
+
+// Регистрация пользователя
+async function handleRegister() {
+    console.log("🟢 Нажата кнопка регистрации");
+
+    const username = document.getElementById("modal-username").value.trim();
+    const password = document.getElementById("modal-password").value.trim();
+
+    if (!username || !password) {
+        showError("Введите имя пользователя и пароль!");
+        return;
+    }
+
+    console.log(`📡 Отправляем запрос на регистрацию (${username})`);
+
+    try {
+        const response = await fetch(`${baseUrl}/register`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+        console.log("📩 Ответ сервера:", data);
+
+        if (response.ok) {
+            localStorage.setItem("token", data.access_token);
+            localStorage.setItem("username", username);
+            console.log("✅ Регистрация успешна, редирект в game.html...");
+            window.location.href = "game.html";
+        } else {
+            alert(data.detail || "Ошибка при регистрации.");
+        }
+    } catch (error) {
+        console.error("❌ Ошибка при регистрации:", error);
+        alert("Ошибка сети. Попробуйте снова.");
+    }
+}
+
+// Проверка авторизации
+function checkAuth() {
+    const token = localStorage.getItem("token");
+    const path = window.location.pathname;
+
+    if (token) {
+        if (!path.includes("game.html")) {
+            console.log("✅ Пользователь авторизован, перенаправляем в игру...");
+            window.location.href = "game.html";
+        }
+    } else {
+        if (path.includes("game.html")) {
+            console.log("🚫 Нет токена, перенаправляем на регистрацию...");
+            window.location.href = "register.html";
+        }
+    }
+}
 
 // Восстановление состояния при загрузке страницы
 // Восстановление состояния при загрузке страницы
@@ -361,39 +470,40 @@ async function playDice() {
 //Эндпоинт для покупки бросков.
 // Покупка бросков
 async function buyRolls() {
-    const username = document.getElementById("profile-username").innerText;
-    if (!username || username === "Guest") {
-        logMessage("Пожалуйста, зарегистрируйтесь!", "error");
-        return;
-    }
-
-    const rollsToBuy = parseInt(prompt("Сколько бросков вы хотите купить? (1 бросок = 10 монет)"), 10);
-    if (isNaN(rollsToBuy) || rollsToBuy <= 0) {
-        logMessage("Некорректное количество бросков.", "error");
-        return;
-    }
-
-    try {
-        const response = await fetch(`${baseUrl}/buy-rolls/${username}`, {
-            method: "POST",
-            headers: {
-                "Authorization": "Bearer " + localStorage.getItem("token"),
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ rolls: rollsToBuy })
-        });
-        const data = await response.json();
-
-        if (response.ok) {
-            document.getElementById("stat-coins").innerText = data.total_coins;
-            document.getElementById("stat-free-rolls").innerText = data.free_rolls;
-            logMessage(data.message, "success");
-        } else {
-            logMessage(data.detail || "Ошибка при покупке бросков.", "error");
+    showModal("Сколько бросков вы хотите купить? (1 бросок = 10 монет)", async (rollsToBuy) => {
+        if (!rollsToBuy || rollsToBuy <= 0) {
+            showModal("Некорректное количество бросков.", () => {});
+            return;
         }
-    } catch (error) {
-        logMessage(`Ошибка при покупке бросков: ${error}`, "error");
-    }
+
+        const username = document.getElementById("profile-username").innerText;
+        if (!username || username === "Guest") {
+            showModal("Пожалуйста, зарегистрируйтесь!", () => {});
+            return;
+        }
+
+        try {
+            const response = await fetch(`${baseUrl}/buy-rolls/${username}`, {
+                method: "POST",
+                headers: {
+                    "Authorization": "Bearer " + localStorage.getItem("token"),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ rolls: rollsToBuy })
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                document.getElementById("stat-coins").innerText = data.total_coins;
+                document.getElementById("stat-free-rolls").innerText = data.free_rolls;
+                showModal(data.message, () => {});
+            } else {
+                showModal(data.detail || "Ошибка при покупке бросков.", () => {});
+            }
+        } catch (error) {
+            showModal("Ошибка при покупке бросков: " + error, () => {});
+        }
+    }, true);
 }
 
 
@@ -462,35 +572,33 @@ function updateProfile(username, data) {
 async function deleteProfile() {
     const username = document.getElementById("profile-username").innerText;
     if (!username || username === "Guest") {
-        alert("Пожалуйста, зарегистрируйтесь!");
+        showModal("Пожалуйста, зарегистрируйтесь!", () => {});
         return;
     }
 
-    const confirmDelete = confirm("Вы уверены, что хотите удалить свой профиль? Это действие нельзя отменить.");
-    if (!confirmDelete) {
-        return;
-    }
+    showModal("Вы уверены, что хотите удалить свой профиль? Это действие нельзя отменить.", async (confirmed) => {
+        if (!confirmed) return;
 
-    try {
-        const response = await fetch(`${baseUrl}/delete-profile/${username}`, {
-            method: "DELETE"
-        });
-        const data = await response.json();
+        try {
+            const response = await fetch(`${baseUrl}/delete-profile/${username}`, {
+                method: "DELETE"
+            });
+            const data = await response.json();
 
-        if (response.ok) {
-            logMessage(data.message, "success");
-            removeFromLocalStorage("username"); // Удаляем имя пользователя
-            if (!window.alreadyRedirected) {
-                window.alreadyRedirected = true;
-                window.location.href = "register.html"; // Перенаправляем на страницу регистрации
+            if (response.ok) {
+                showModal("Аккаунт успешно удален.", () => {
+                    removeFromLocalStorage("username");
+                    window.location.href = "register.html";
+                });
+            } else {
+                showModal(data.detail || "Ошибка при удалении профиля.", () => {});
             }
-        } else {
-            logMessage(data.detail || "Ошибка при удалении профиля.", "error");
+        } catch (error) {
+            showModal("Произошла ошибка при удалении профиля.", () => {});
         }
-    } catch (error) {
-        logMessage("Произошла ошибка при удалении профиля.", "error");
-    }
+    });
 }
+
 
 
 
@@ -560,7 +668,7 @@ function toggleAvatarSelector() {
 async function selectAvatar(avatarName) {
     const username = document.getElementById("profile-username").innerText;
     if (!username || username === "Guest") {
-        alert("Пожалуйста, зарегистрируйтесь!");
+        showModal("Пожалуйста, зарегистрируйтесь!", () => {});
         return;
     }
 
@@ -573,19 +681,24 @@ async function selectAvatar(avatarName) {
             },
             body: JSON.stringify({ avatar: avatarName })
         });
+
         const data = await response.json();
 
         if (response.ok) {
-            // Обновляем аватар на странице
-            document.getElementById("avatar").src = `/static/avatars/${avatarName}?v=` + new Date().getTime();
-            alert("Аватарка успешно изменена!");
+            const avatarElement = document.getElementById("avatar");
+
+            // Обход кеша с `?v=` + timestamp
+            avatarElement.src = `/static/avatars/${avatarName}?v=${new Date().getTime()}`;
+
+            showModal("Аватарка успешно изменена!", () => {});
         } else {
-            alert(data.detail || "Ошибка при изменении аватарки.");
+            showModal(data.detail || "Ошибка при изменении аватарки.", () => {});
         }
     } catch (error) {
-        alert("Произошла ошибка при изменении аватарки.");
+        showModal("Произошла ошибка при изменении аватарки.", () => {});
     }
 }
+
 
 
 
@@ -686,6 +799,35 @@ function toggleMenu() {
     }
 }
 
+function showModal(message, callback, inputRequired = false) {
+    const modal = document.getElementById("custom-modal");
+    const messageElement = document.getElementById("modal-message");
+    const inputField = document.getElementById("modal-input");
+    const confirmButton = document.getElementById("modal-confirm");
+    const cancelButton = document.getElementById("modal-cancel");
+
+    messageElement.textContent = message;
+    modal.classList.remove("hidden");
+
+    if (inputRequired) {
+        inputField.classList.remove("hidden");
+        inputField.value = "";
+        inputField.focus();
+    } else {
+        inputField.classList.add("hidden");
+    }
+
+    confirmButton.onclick = () => {
+        const inputValue = inputRequired ? parseInt(inputField.value, 10) : true;
+        modal.classList.add("hidden");
+        callback(inputValue);
+    };
+
+    cancelButton.onclick = () => {
+        modal.classList.add("hidden");
+        callback(false);
+    };
+}
 
 
 
