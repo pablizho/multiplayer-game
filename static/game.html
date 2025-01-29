@@ -8,35 +8,38 @@
 </head>
 <body>
     <div class="container">
-        <!-- Боковая панель -->
-        <aside class="stats-panel">
-            <div id="profile">
-                <h2 id="profile-username">Guest</h2>
-                <img id="avatar" src="/static/avatars/default_avatar.jpg" alt="Avatar" class="avatar">
-            </div>
-            <div id="timer-display"></div>
-            <div class="stats">
-                <p><b>Coins:</b> <span id="stat-coins">0</span></p>
-                <p><b>Rank:</b> <span id="stat-rank">---</span></p>
-                <p><b>Free Rolls:</b> <span id="stat-free-rolls">10</span></p>
-            </div>
-            <button onclick="toggleSettingsMenu()">⚙️</button>
-            <!-- Меню настроек -->
-            <div id="settings-menu" class="compact-menu hidden">
-                <button onclick="deleteProfile()">🗑️</button>
-                <button onclick="toggleAvatarSelector()">🎭</button>
-                <!-- Селектор аватарок -->
-                <div id="avatar-selector" class="avatar-menu hidden">
-                    <div class="avatar-scroll">
-                        <img src="/static/avatars/avatar1.jpg" alt="Avatar 1" onclick="selectAvatar('avatar1.jpg')">
-                        <img src="/static/avatars/avatar2.jpg" alt="Avatar 2" onclick="selectAvatar('avatar2.jpg')">
-                        <img src="/static/avatars/avatar3.jpg" alt="Avatar 3" onclick="selectAvatar('avatar3.jpg')">
-                    </div>
-                    <button onclick="toggleAvatarSelector()">✖️</button>
-                </div>
+        <!-- Кнопка для открытия меню -->
+    <button class="menu-toggle" onclick="toggleMenu()">☰</button>
 
+<!-- Боковая панель -->
+<aside id="stats-panel" class="stats-panel" style="display: none;">
+    <div id="profile-settings-container">
+        <div id="profile">
+            <h2 id="profile-username">Guest</h2>
+            <img id="avatar" src="/static/avatars/default_avatar.jpg" alt="Avatar" class="avatar">
+        </div>
+        <div id="timer-display"></div>
+        <div class="stats">
+            <p><b>Coins:</b> <span id="stat-coins">0</span></p>
+            <p><b>Rank:</b> <span id="stat-rank">---</span></p>
+            <p><b>Free Rolls:</b> <span id="stat-free-rolls">10</span></p>
+        </div>
+        <button onclick="toggleSettingsMenu()">⚙️</button>
+        <div id="settings-menu" class="compact-menu hidden">
+            <button onclick="deleteProfile()">🗑️</button>
+            <button onclick="toggleAvatarSelector()">🎭</button>
+            <div id="avatar-selector" class="avatar-menu hidden">
+                <div class="avatar-scroll">
+                    <img src="/static/avatars/avatar1.jpg" alt="Avatar 1" onclick="selectAvatar('avatar1.jpg')">
+                    <img src="/static/avatars/avatar2.jpg" alt="Avatar 2" onclick="selectAvatar('avatar2.jpg')">
+                    <img src="/static/avatars/avatar3.jpg" alt="Avatar 3" onclick="selectAvatar('avatar3.jpg')">
+                </div>
+                <button onclick="toggleAvatarSelector()">✖️</button>
             </div>
-        </aside>
+        </div>
+    </div>
+</aside>
+
 
         <!-- Центральная панель -->
         <main>

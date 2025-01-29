@@ -102,7 +102,7 @@ function adjustLayout() {
         // Проверяем размеры анимации
         if (animationArea) {
         const containerWidth = animationArea.offsetWidth;
-        animationArea.style.height = `${Math.max(150, containerWidth * 9 / 16)}px`; // Пропорция 16:9
+        animationArea.style.height = `${Math.max(100, containerWidth * 6 / 16)}px`; // Пропорция 6:16
     }
 
         // Проверяем высоту нижних элементов
@@ -534,17 +534,10 @@ function restoreLogs() {
 // функции для управления меню:
 function toggleSettingsMenu() {
     const settingsMenu = document.getElementById("settings-menu");
-    const avatarMenu = document.getElementById("avatar-selector");
+    if (!settingsMenu) return;
 
-    if (settingsMenu) {
-        settingsMenu.classList.toggle("active");
-
-        // Скрываем окно выбора аватарок при открытии настроек
-        if (avatarMenu && settingsMenu.classList.contains("active")) {
-            avatarMenu.classList.add("hidden");
-            avatarMenu.style.display = "none"; // Принудительно скрываем
-        }
-    }
+    settingsMenu.classList.toggle("hidden");
+    settingsMenu.style.display = settingsMenu.classList.contains("hidden") ? "none" : "block";
 }
 
 function toggleAvatarSelector() {
@@ -679,6 +672,21 @@ function startTimer(duration, display) {
         }
     }, 1000);
 }
+
+
+function toggleMenu() {
+    const panel = document.getElementById("stats-panel");
+    
+    if (panel.style.display === "none") {
+        panel.style.display = "block";
+        setTimeout(() => panel.classList.add("active"), 10);
+    } else {
+        panel.classList.remove("active");
+        setTimeout(() => panel.style.display = "none", 300);
+    }
+}
+
+
 
 
 function formatTimeRemaining(seconds) {
