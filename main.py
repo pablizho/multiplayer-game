@@ -866,14 +866,20 @@ def rematch(
     if room.status != "finished":
         raise HTTPException(status_code=400, detail="Игра еще не завершена")
     
-    # Сбросить ставки и счет побед:
+    # Сброс игровых показателей
     room.host_bet = 0
     room.guest_bet = 0
-    room.host_wins = 0
-    room.guest_wins = 0
+    room.stage = 1
+    room.host_total = 0
+    room.guest_total = 0
+    room.host_stage_result = 0
+    room.guest_stage_result = 0
+    room.turn = ""
     room.status = "waiting"
+    room.rematch_offer = ""
     db.commit()
     return {"message": "Новая игра началась. Сделайте ставки."}
+
 
 
 # WebSocket‑эндпоинт для обновления игровых данных:
@@ -910,11 +916,11 @@ async def player_ready(room_id: int, current_user: PlayerModel = Depends(get_cur
         room.guest_ready = 1
     db.commit()
     
-    # Добавляем проверку ставок: если хотя бы одна ставка равна 0, то игра не запускается
+    # Если хотя бы одна из ставок не установлена, игра не стартует
     if room.host_bet <= 0 or room.guest_bet <= 0:
         return {"message": "Сначала сделайте ставки обоим игрокам"}
     
-    # Если оба игрока готовы и ставки установлены, переводим комнату в состояние "rolling"
+    # Если оба игрока готовы и ставки установлены, запускаем игру
     if room.host_ready and room.guest_ready:
         turn = random.choice(["host", "guest"])
         room.turn = turn
@@ -924,10 +930,15 @@ async def player_ready(room_id: int, current_user: PlayerModel = Depends(get_cur
         db.commit()
         await manager.broadcast(room_id, {
             "event": "round_start",
-            "payload": {"turn": turn, "stage": room.stage, "status": room.status,
-                        "message": "Раунд начался, бросьте кубик"}
+            "payload": {
+                "turn": turn,
+                "stage": room.stage,
+                "status": room.status,
+                "message": "Раунд начался, бросьте кубик"
+            }
         })
     return {"message": "Готовность подтверждена."}
+
 
 
 
