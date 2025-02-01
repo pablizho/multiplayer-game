@@ -581,10 +581,15 @@ def join_room(room_id: int, current_user: PlayerModel = Depends(get_current_user
         raise HTTPException(status_code=400, detail="Нельзя подключиться к своей же комнате")
     
     room.guest_username = current_user.username
-    # Обновляем статус – игра начнется после ставок
     room.status = "waiting"
     db.commit()
-    return {"message": f"Вы подключены к комнате {room_id}", "room_id": room.id}
+    return {
+        "message": f"Вы подключены к комнате {room_id}",
+        "room_id": room.id,
+        "host": room.host_username,
+        "guest": room.guest_username
+    }
+
 
 #Удаление комнаты
 #Удаление может производиться только хостом.

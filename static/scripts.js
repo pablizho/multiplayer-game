@@ -1066,17 +1066,16 @@ document.getElementById("create-room-btn").addEventListener("click", async () =>
     const data = await response.json();
     alert(data.message);
     loadRooms(); // обновляем список комнат
-    // Подключаемся по WebSocket к созданной комнате
     currentRoomId = data.room_id;
-    (currentRoomId);
-
-    // Показываем игровой интерфейс
+    connectWebSocket(currentRoomId);
+    // Вызываем showGameRoom: хост – текущий пользователь, гость пока не определён
     showGameRoom(data.room_id, localStorage.getItem("username"), "");
   } catch (error) {
     console.error("Ошибка создания комнаты:", error);
     alert("Ошибка создания комнаты: " + error.message);
   }
 });
+
 
 
 
@@ -1097,16 +1096,16 @@ async function joinRoom(roomId) {
     const data = await response.json();
     alert(data.message);
     loadRooms(); // обновляем список комнат
-    // Подключаемся по WebSocket к созданной комнате
     currentRoomId = data.room_id;
     connectWebSocket(currentRoomId);
-    // Показываем игровой интерфейс
-    showGameRoom(data.room_id, localStorage.getItem("username"), "");
+    // Передаем хост и гостя из ответа
+    showGameRoom(data.room_id, data.host, data.guest);
   } catch (error) {
-    console.error("Ошибка создания комнаты:", error);
-    alert("Ошибка создания комнаты: " + error.message);
+    console.error("Ошибка подключения к комнате:", error);
+    alert("Ошибка подключения к комнате: " + error.message);
   }
 }
+
 
 
 async function deleteRoom(roomId) {
@@ -1136,10 +1135,10 @@ function showGameRoom(roomId, host, guest) {
   const roomInfo = document.getElementById("room-info");
   roomInfo.textContent = `Комната #${roomId}. Хост: ${host}, Гость: ${guest || '---'}`;
   
-  // Показываем оверлей игрового интерфейса внутри rooms-modal
   const gameRoomOverlay = document.getElementById("game-room-overlay");
   gameRoomOverlay.classList.remove("hidden");
 }
+
 // Обработчик закрытия игрового интерфейса
 document.getElementById("close-game-room-btn").addEventListener("click", () => {
   const gameRoomOverlay = document.getElementById("game-room-overlay");
@@ -1153,20 +1152,62 @@ async function placeBet() {
     alert("Введите корректную сумму ставки!");
     return;
   }
-  ws.send(JSON.stringify({
-      event: "bet",
-      payload: { bet: betAmount, room_id: currentRoomId }
-  }));
+  try {
+    const response = await fetch(`${baseUrl}/rooms/${currentRoomId}/bet`, {
+      method: "POST",
+      headers: {
+         "Content-Type": "application/json",
+         "Authorization": "Bearer " + localStorage.getItem("token")
+      },
+      body: JSON.stringify({ bet: betAmount })
+    });
+    const data = await response.json();
+    if (response.ok) {
+      alert("Ставка принята");
+      // При необходимости обновите состояние комнаты (например, обновите отображение ставок)
+      // Можно также запустить WS‑обновление или обновить профиль
+    } else {
+      alert(data.detail || "Ошибка при ставке.");
+    }
+  } catch (error) {
+    console.error("Ошибка при ставке:", error);
+    alert("Ошибка при ставке");
+  }
 }
 
 
-// Функция для броска кубиков (запуска раунда) через WebSocket
 async function rollDice() {
-  ws.send(JSON.stringify({
-      event: "roll",
-      payload: { room_id: currentRoomId }
-  }));
+  try {
+    const response = await fetch(`${baseUrl}/rooms/${currentRoomId}/roll`, {
+      method: "POST",
+      headers: {
+         "Authorization": "Bearer " + localStorage.getItem("token")
+      }
+    });
+    const data = await response.json();
+    if (response.ok) {
+      // Обновляем отображение результата игры
+      const resultDiv = document.getElementById("game-result");
+      resultDiv.innerHTML = `
+        <p>${data.round_result}</p>
+        <p>Кубики: Хост ${data.host_dice} – Гость ${data.guest_dice}</p>
+        <p>Счёт: Хост ${data.host_wins} – Гость ${data.guest_wins}</p>
+        <p>Ставка: Хост ${data.host_bet} – Гость ${data.guest_bet}</p>
+      `;
+      if (data.status === "finished") {
+         document.getElementById("place-bet-btn").disabled = true;
+         document.getElementById("roll-btn").disabled = true;
+         showRematchModal(data.message);
+      }
+    } else {
+      alert(data.detail || "Ошибка при броске кубиков");
+    }
+  } catch (error) {
+    console.error("Ошибка при броске кубиков:", error);
+    alert("Ошибка при броске кубиков");
+  }
 }
+
 
 
 // Функция показа окна переигровки
