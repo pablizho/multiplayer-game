@@ -764,7 +764,7 @@ async def roll_dice(
         room.guest_total += dice_value
         db.commit()
         
-        # Рассылаем результат броска гостя
+        # Рассылаем результат броска гостяяя
         payload = {
             "dice_value": dice_value,
             "player": room.guest_username,
