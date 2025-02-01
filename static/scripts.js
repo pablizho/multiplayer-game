@@ -1,12 +1,14 @@
 const baseUrl = window.location.origin;
 
-let currentRoomId = null; // Глобальная переменная для хранения id текущей комнаты
-let ws;  // глобальная переменная для WebSocket
+// Глобальные переменные для хранения состояния игры в комнате
+let currentRoomId = null;
+let ws;  // WebSocket
+let currentTurn = "";  // "host" или "guest"
+let currentStage = 1;  // Номер текущего раунда
 
 
-// Функция для установления WebSocket-подключения к комнате
+// Функция для установления WebSocket‑подключения к комнате
 function connectWebSocket(roomId) {
-  // Если страница загружена через HTTPS, используем wss, иначе ws
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
   ws = new WebSocket(`${protocol}://${window.location.host}/ws/rooms/${roomId}`);
   ws.onopen = () => {
@@ -15,23 +17,67 @@ function connectWebSocket(roomId) {
   ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
     console.log("Получено обновление:", data);
-    // Обработка обновлений игрового состояния:
-    if (data.event === "game_update") {
-      const resultDiv = document.getElementById("game-result");
-      resultDiv.innerHTML = `
-        <p>${data.payload.round_result}</p>
-        <p>Кубики: Хост ${data.payload.host_dice} – Гость ${data.payload.guest_dice}</p>
-        <p>Счёт: Хост ${data.payload.host_wins} – Гость ${data.payload.guest_wins}</p>
-        <p>Ставка: Хост ${data.payload.host_bet} – Гость ${data.payload.guest_bet}</p>
-      `;
-      if (data.payload.status === "finished") {
-        document.getElementById("place-bet-btn").disabled = true;
+    // Обработка новых событий от сервера:
+    if (data.event === "round_start") {
+      // Новый раунд начинается – сервер сообщает, чей ход
+      currentTurn = data.payload.turn;
+      currentStage = data.payload.stage;
+      document.getElementById("game-result").innerHTML = 
+        `<p>Раунд ${currentStage} начался. Ход: ${currentTurn === "host" ? "Хост" : "Гость"}</p>`;
+      // Показываем кнопку "Готов" (скрытая ранее)
+      document.getElementById("ready-btn").classList.remove("hidden");
+      // Блокируем кнопку броска до нажатия "Готов"
+      document.getElementById("roll-btn").disabled = true;
+    }
+    else if (data.event === "dice_result") {
+      // Получен результат броска
+      const payload = data.payload;
+      document.getElementById("game-result").innerHTML += 
+        `<p>${payload.player} бросил кубик: ${payload.dice_value}</p>
+         <p>Текущий счёт: Хост ${payload.host_total} – Гость ${payload.guest_total}</p>`;
+      // Если статус игры "finished", дальше обрабатываем финальное сообщение
+      if (payload.status === "finished") {
+        // Завершена игра – блокируем кнопки
         document.getElementById("roll-btn").disabled = true;
-        showRematchModal(data.payload.final_message);
+        document.getElementById("ready-btn").disabled = true;
+      } else {
+        // Если раунд завершён (то есть ход сменился на пустой),
+        // значит раунд окончен – нужно ждать подтверждения готовности для следующего
+        if (!payload.playerTurn) {
+          document.getElementById("roll-btn").disabled = true;
+          document.getElementById("ready-btn").classList.remove("hidden");
+        }
       }
     }
-    if (data.event === "update_balance") {
-      document.getElementById("stat-coins").textContent = data.payload.coins;
+    else if (data.event === "game_finished") {
+      // Игра окончена, сервер посылает финальное сообщение
+      const payload = data.payload;
+      document.getElementById("game-result").innerHTML += `<p>${payload.final_message}</p>`;
+      // Если игра закончилась ничьей, можно показать кнопку предложения переигровки
+      if (payload.winner === "tie") {
+        showRematchOfferUI();
+      }
+      else {
+        // Иначе игра окончена – можно заблокировать интерфейс
+        document.getElementById("roll-btn").disabled = true;
+        document.getElementById("ready-btn").disabled = true;
+      }
+    }
+    else if (data.event === "rematch_offer") {
+      // Другой игрок предложил переигровку – предлагаем ответить
+      const offerFrom = data.payload.from;
+      const accept = confirm(`Игрок ${offerFrom} предлагает переиграть матч. Принять?`);
+      answerRematch(accept);
+    }
+    else if (data.event === "rematch_accepted") {
+      // Переигровка принята – обновляем интерфейс для новой игры
+      alert(data.payload.message);
+      resetGameUI();
+    }
+    else if (data.event === "rematch_declined") {
+      alert(data.payload.message);
+      // Можно закрыть окно игры или предложить выйти из комнаты
+      document.getElementById("game-room-overlay").classList.add("hidden");
     }
   };
   ws.onclose = () => {
@@ -995,58 +1041,74 @@ async function loadRooms() {
     container.innerHTML = ""; // очистка контейнера
 
     const currentUser = localStorage.getItem("username");
-    let userHasRoom = false;
 
     data.rooms.forEach(room => {
-      if (currentUser === room.host) {
-        userHasRoom = true;
-      }
       // Создаем элемент для комнаты
       const roomDiv = document.createElement("div");
       roomDiv.classList.add("room-item");
       roomDiv.style.borderBottom = "1px solid #ccc";
-      roomDiv.style.padding = "10px 0";
-      roomDiv.style.display = "flex";
-      roomDiv.style.justifyContent = "space-between";
-      roomDiv.style.alignItems = "center";
-      
-      // Левая часть записи: информация о комнате
-      const infoDiv = document.createElement("div");
-      infoDiv.innerHTML = `<strong>Комната #${room.room_id}</strong><br>
+      roomDiv.style.padding = "10px";
+      roomDiv.style.cursor = "pointer";
+      roomDiv.style.position = "relative"; // чтобы кнопка удаления могла позиционироваться внутри
+
+      // Формируем информацию о комнате
+      roomDiv.innerHTML = `
+        <strong>Комната #${room.room_id}</strong><br>
         Хост: ${room.host}<br>
-        Участников: ${room.participants}`;
-      
-      // Правая часть записи: кнопка (если можно присоединиться)
-      const actionDiv = document.createElement("div");
-      if (currentUser !== room.host) {
-        const joinBtn = document.createElement("button");
-        joinBtn.textContent = "Присоединиться";
-        joinBtn.onclick = () => joinRoom(room.room_id);
-        actionDiv.appendChild(joinBtn);
+        Гость: ${room.guest || '---'}<br>
+        Участников: ${room.participants}
+      `;
+
+      // Если текущий пользователь уже участвует в комнате,
+      // делаем всю запись кликабельной для повторного входа
+      if (currentUser === room.host || currentUser === room.guest) {
+        roomDiv.onclick = () => {
+          currentRoomId = room.room_id;
+          connectWebSocket(currentRoomId);
+          showGameRoom(room.room_id, room.host, room.guest);
+        };
+
+        // Если пользователь является хозяином, добавляем кнопку "Удалить"
+        if (currentUser === room.host) {
+          const deleteBtn = document.createElement("button");
+          deleteBtn.textContent = "Удалить";
+          deleteBtn.style.position = "absolute";
+          deleteBtn.style.top = "5px";
+          deleteBtn.style.right = "5px";
+          deleteBtn.style.backgroundColor = "#e94560";
+          deleteBtn.style.color = "#fff";
+          deleteBtn.style.border = "none";
+          deleteBtn.style.padding = "3px 6px";
+          deleteBtn.style.cursor = "pointer";
+          deleteBtn.addEventListener("click", (e) => {
+            e.stopPropagation(); // чтобы не срабатывал клик на всей записи
+            if (confirm("Вы уверены, что хотите удалить эту комнату?")) {
+              deleteRoom(room.room_id);
+            }
+          });
+          roomDiv.appendChild(deleteBtn);
+        }
       } else {
-        const deleteBtn = document.createElement("button");
-        deleteBtn.textContent = "Удалить";
-        deleteBtn.onclick = () => deleteRoom(room.room_id);
-        actionDiv.appendChild(deleteBtn);
+        // Если пользователь не в комнате – при клике вызываем joinRoom
+        roomDiv.onclick = () => joinRoom(room.room_id);
       }
-      
-      roomDiv.appendChild(infoDiv);
-      roomDiv.appendChild(actionDiv);
       container.appendChild(roomDiv);
     });
 
-    // Если пользователь уже создал комнату, скрываем кнопку создания комнаты
+    // Если пользователь уже создал комнату, можно скрыть кнопку создания комнаты,
+    // либо оставить её видимой – в данном случае код не меняется.
     const createRoomBtn = document.querySelector(".create-room-area button");
-    if (userHasRoom) {
-      createRoomBtn.style.display = "none";
-    } else {
-      createRoomBtn.style.display = "inline-block";
-    }
+    // Например, если пользователь уже является хозяином хотя бы одной комнаты,
+    // можно скрыть кнопку:
+    const userHasRoom = data.rooms.some(room => currentUser === room.host);
+    createRoomBtn.style.display = userHasRoom ? "none" : "inline-block";
   } catch (error) {
     console.error("Ошибка загрузки комнат:", error);
     alert("Ошибка загрузки комнат: " + error.message);
   }
 }
+
+
 
 
 
@@ -1176,45 +1238,12 @@ async function placeBet() {
 }
 
 
-async function rollDice() {
-  try {
-    const response = await fetch(`${baseUrl}/rooms/${currentRoomId}/roll`, {
-      method: "POST",
-      headers: {
-         "Authorization": "Bearer " + localStorage.getItem("token")
-      }
-    });
-    const data = await response.json();
-    if (response.ok) {
-      // Обновляем отображение результата игры
-      const resultDiv = document.getElementById("game-result");
-      resultDiv.innerHTML = `
-        <p>${data.round_result}</p>
-        <p>Кубики: Хост ${data.host_dice} – Гость ${data.guest_dice}</p>
-        <p>Счёт: Хост ${data.host_wins} – Гость ${data.guest_wins}</p>
-        <p>Ставка: Хост ${data.host_bet} – Гость ${data.guest_bet}</p>
-      `;
-      if (data.status === "finished") {
-         document.getElementById("place-bet-btn").disabled = true;
-         document.getElementById("roll-btn").disabled = true;
-         showRematchModal(data.message);
-      }
-    } else {
-      alert(data.detail || "Ошибка при броске кубиков");
-    }
-  } catch (error) {
-    console.error("Ошибка при броске кубиков:", error);
-    alert("Ошибка при броске кубиков");
-  }
-}
-
-
 
 // Функция показа окна переигровки
 function showRematchModal(finalMessage) {
   const rematchConfirmed = confirm(finalMessage + "\nХотите сыграть еще раз?");
   if (rematchConfirmed) {
-    rematch();
+    proposeRematch();
   } else {
     // Если игрок отказывается, закрываем игровой интерфейс (оверлей)
     document.getElementById("game-room-overlay").classList.add("hidden");
@@ -1222,17 +1251,111 @@ function showRematchModal(finalMessage) {
 }
 
 
-// Функция для переигровки: отправляем событие через WebSocket
-async function rematch() {
-  ws.send(JSON.stringify({
-      event: "rematch",
-      payload: { room_id: currentRoomId }
-  }));
-  document.getElementById("place-bet-btn").disabled = false;
-  document.getElementById("roll-btn").disabled = false;
-  document.getElementById("bet-amount").value = "";
-  document.getElementById("game-result").innerHTML = "";
+// Функция отправки подтверждения готовности
+async function markReady() {
+  // Скрываем кнопку "Готов", чтобы не отправлять повторно
+  document.getElementById("ready-btn").disabled = true;
+  try {
+    const token = localStorage.getItem("token");
+    const response = await fetch(`${baseUrl}/rooms/${currentRoomId}/ready`, {
+      method: "POST",
+      headers: {
+         "Content-Type": "application/json",
+         "Authorization": "Bearer " + token
+      }
+    });
+    const data = await response.json();
+    console.log("Готовность подтверждена:", data.message);
+    // Если оба игрока подтвердили, сервер выберет первого бросающего.
+  } catch (error) {
+    console.error("Ошибка подтверждения готовности:", error);
+  }
 }
+
+// Новая функция для броска кубика через игровой endpoint
+async function rollDice() {
+  try {
+    const token = localStorage.getItem("token");
+    const response = await fetch(`${baseUrl}/rooms/${currentRoomId}/roll`, {
+      method: "POST",
+      headers: {
+         "Content-Type": "application/json",
+         "Authorization": "Bearer " + token
+      }
+    });
+    const data = await response.json();
+    console.log("Результат броска:", data.dice);
+    // Интерфейс обновится через WS-сообщение "dice_result"
+  } catch (error) {
+    console.error("Ошибка броска кубика:", error);
+  }
+}
+
+
+// Функция показа UI для предложения переигровки (например, показываем кнопку "Переиграть")
+function showRematchOfferUI() {
+  // Здесь можно, например, заменить содержимое game-room-overlay:
+  const gameResultDiv = document.getElementById("game-result");
+  gameResultDiv.innerHTML += `<button id="rematch-btn" onclick="proposeRematch()">Предложить переигровку</button>`;
+}
+
+// Функция для отправки предложения переигровки
+async function proposeRematch() {
+  try {
+    const token = localStorage.getItem("token");
+    const response = await fetch(`${baseUrl}/rooms/${currentRoomId}/rematch_offer`, {
+      method: "POST",
+      headers: {
+         "Content-Type": "application/json",
+         "Authorization": "Bearer " + token
+      }
+    });
+    const data = await response.json();
+    console.log("Предложение переигровки отправлено:", data.message);
+    // Удаляем кнопку, чтобы повторно не предлагать
+    document.getElementById("rematch-btn").remove();
+  } catch (error) {
+    console.error("Ошибка отправки предложения переигровки:", error);
+  }
+}
+
+// Функция для ответа на предложение переигровки
+async function answerRematch(accept) {
+  try {
+    const token = localStorage.getItem("token");
+    const response = await fetch(`${baseUrl}/rooms/${currentRoomId}/rematch_response`, {
+      method: "POST",
+      headers: {
+         "Content-Type": "application/json",
+         "Authorization": "Bearer " + token
+      },
+      body: JSON.stringify({ accept: accept })
+    });
+    const data = await response.json();
+    console.log("Ответ на предложение переигровки:", data.message);
+    // Если принято, UI обновится через событие "rematch_accepted"
+  } catch (error) {
+    console.error("Ошибка ответа на предложение переигровки:", error);
+  }
+}
+
+// Функция сброса игрового UI для новой игры (после переигровки)
+function resetGameUI() {
+  // Сбросим показатели и обновим надписи
+  currentStage = 1;
+  currentTurn = "";
+  document.getElementById("game-result").innerHTML = "<p>Новая игра началась. Сделайте ставку и нажмите 'Готов'.</p>";
+  // Разблокируем кнопки
+  document.getElementById("ready-btn").disabled = false;
+  document.getElementById("roll-btn").disabled = true;
+}
+
+// Привязка обработчиков к кнопкам игровой комнаты
+document.getElementById("roll-btn").addEventListener("click", rollDice);
+// Кнопка "Готов" уже указана в разметке с onclick="markReady()"
+
+// Если ранее использовался код rematch(), его можно убрать или заменить на вызовы proposeRematch()/answerRematch().
+
 
 
 // Привязываем обработчики к кнопкам игрового интерфейса

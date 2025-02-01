@@ -96,21 +96,26 @@ class PlayerModel(Base):
 
 # Модель комнаты
 class RoomModel(Base):
-    __tablename__ = "rooms_v2"
+    __tablename__ = "rooms_v3"
     id = Column(Integer, primary_key=True, index=True)
-    # Игрок, создавший комнату (хост)
     host_username = Column(String, nullable=False)
-    # Второй игрок, может быть None до подключения
     guest_username = Column(String, nullable=True)
-    # Суммы ставок игроков в текущем раунде
     host_bet = Column(Integer, default=0)
     guest_bet = Column(Integer, default=0)
-    # Количество побед в текущей игре
-    host_wins = Column(Integer, default=0)
-    guest_wins = Column(Integer, default=0)
-    # Статус комнаты: waiting, in_progress, finished
-    status = Column(String, default="waiting")
+    # Старые поля ставок и побед можно оставить для этапа ставок,
+    # но для игрового процесса добавляем новые:
+    status = Column(String, default="waiting")  # Возможные значения: waiting (ставки), ready, rolling, finished
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    stage = Column(Integer, default=1)            # Номер текущего раунда (1..3)
+    host_ready = Column(Integer, default=0)         # Флаг готовности хоста (0/1)
+    guest_ready = Column(Integer, default=0)        # Флаг готовности гостя (0/1)
+    turn = Column(String, default="")               # Чей ход: "host" или "guest"
+    host_total = Column(Integer, default=0)         # Суммарное количество очков хоста
+    guest_total = Column(Integer, default=0)        # Суммарное количество очков гостя
+    host_stage_result = Column(Integer, default=0)  # Результат броска в текущем раунде (хост)
+    guest_stage_result = Column(Integer, default=0) # Результат броска в текущем раунде (гость)
+    rematch_offer = Column(String, default="")      # Если один игрок предложил переигровку, сохраняем его имя
 
 
 # Создание таблиц
@@ -684,83 +689,78 @@ def place_bet(
 #Бросок кубиков и определение победителя раунда
 #При вызове этого эндпоинта происходит бросок кубиков для обоих игроков. Победитель раунда получает сумму ставок.
 #После раунда ставки обнуляются. Если один из игроков достиг 3 побед, игра завершается.
+# ====================================
+# Эндпоинт броска кубика (игровой этап)
+# ====================================
+
 @app.post("/rooms/{room_id}/roll")
-def roll_dice(
-    room_id: int, 
-    current_user: PlayerModel = Depends(get_current_user), 
-    db: Session = Depends(get_db)
-):
+def roll_dice(room_id: int, current_user: PlayerModel = Depends(get_current_user), db: Session = Depends(get_db)):
     room = db.query(RoomModel).filter_by(id=room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Комната не найдена")
-    if room.status == "finished":
-        raise HTTPException(status_code=400, detail="Игра завершена. Начните новую игру, нажав 'Переиграть'.")
-    if room.host_bet == 0 or room.guest_bet == 0:
-        raise HTTPException(status_code=400, detail="Оба игрока должны сделать ставку")
+    if room.status != "rolling":
+        raise HTTPException(status_code=400, detail="Сейчас нельзя бросать кубик")
     
-    # Генерируем кубики для обоих игроков
-    host_dice = random.randint(1, 6)
-    guest_dice = random.randint(1, 6)
+    # Проверяем, что ход именно у этого игрока
+    if (room.turn == "host" and current_user.username != room.host_username) or \
+       (room.turn == "guest" and current_user.username != room.guest_username):
+        raise HTTPException(status_code=400, detail="Сейчас не ваш ход")
     
-    round_result = ""
-    if host_dice > guest_dice:
-        room.host_wins += 1
-        round_result = f"Хост ({room.host_username}) выигрывает раунд! (кубики: {host_dice} vs {guest_dice})"
-    elif guest_dice > host_dice:
-        room.guest_wins += 1
-        round_result = f"Гость ({room.guest_username}) выигрывает раунд! (кубики: {guest_dice} vs {host_dice})"
+    # Выполняем бросок кубика
+    dice_value = random.randint(1, 6)
+    
+    if room.turn == "host":
+        room.host_stage_result = dice_value
+        room.host_total += dice_value
+        # Теперь ход переходит к гостю
+        room.turn = "guest"
     else:
-        round_result = f"Ничья! (оба выбросили {host_dice})"
-    
-    game_over = False
-    winner = None
-    if room.host_wins >= 3:
-        room.status = "finished"
-        game_over = True
-        winner = room.host_username
-    elif room.guest_wins >= 3:
-        room.status = "finished"
-        game_over = True
-        winner = room.guest_username
-    
-    # Если игра окончена, переводим общий банк (host_bet + guest_bet) победителю
-    if game_over:
-        win_amount = room.host_bet + room.guest_bet
-        if winner == room.host_username:
-            host = db.query(PlayerModel).filter_by(username=room.host_username).first()
-            if host:
-                host.coins += win_amount
-        elif winner == room.guest_username:
-            # Если гость – бот, не обновляем баланс (но вы решили убрать бота)
-            guest = db.query(PlayerModel).filter_by(username=room.guest_username).first()
-            if guest:
-                guest.coins += win_amount
+        room.guest_stage_result = dice_value
+        room.guest_total += dice_value
+        # Завершаем раунд: сбрасываем turn
+        room.turn = ""
+        # Если текущий раунд не последний, переводим комнату в состояние ожидания готовности
+        if room.stage < 3:
+            room.stage += 1
+            room.status = "ready"
+        else:
+            room.status = "finished"
     db.commit()
     
-    response = {
-        "host_dice": host_dice,
-        "guest_dice": guest_dice,
-        "round_result": round_result,
-        "host_wins": room.host_wins,
-        "guest_wins": room.guest_wins,
-        "status": room.status,
-        "host_bet": room.host_bet,
-        "guest_bet": room.guest_bet
+    # Отправляем через WebSocket событие с результатом броска
+    payload = {
+        "dice_value": dice_value,
+        "player": current_user.username,
+        "stage": room.stage if room.stage <= 3 else 3,
+        "host_total": room.host_total,
+        "guest_total": room.guest_total,
+        "status": room.status
     }
-    if game_over:
-        response["message"] = f"Игра окончена! Победитель: {winner}. Выигрыш: {win_amount}"
-        # Отправляем обновление через WebSocket (запускаем в фоне)
-        import asyncio
+    asyncio.create_task(manager.broadcast(room_id, {
+        "event": "dice_result",
+        "payload": payload
+    }))
+    
+    # Если игра завершена, определяем победителя (или ничью) и оповещаем игроков
+    if room.status == "finished":
+        if room.host_total > room.guest_total:
+            winner = room.host_username
+        elif room.guest_total > room.host_total:
+            winner = room.guest_username
+        else:
+            winner = "tie"
+        final_message = "Ничья! Предложите переиграть." if winner == "tie" else f"Победитель: {winner}"
+        payload_final = {
+            "final_message": final_message,
+            "winner": winner,
+            "host_total": room.host_total,
+            "guest_total": room.guest_total
+        }
         asyncio.create_task(manager.broadcast(room_id, {
-            "event": "game_update",
-            "payload": {
-                "status": room.status,
-                "host_wins": room.host_wins,
-                "guest_wins": room.guest_wins,
-                "final_message": response["message"]
-            }
+            "event": "game_finished",
+            "payload": payload_final
         }))
-    return response
+    return {"message": "Кубик брошен", "dice": dice_value}
 
 
 
@@ -803,3 +803,96 @@ async def websocket_endpoint(websocket: WebSocket, room_id: int):
     except WebSocketDisconnect:
         manager.disconnect(room_id, websocket)
 
+# ====================================
+# Эндпоинт для подтверждения готовности
+# ====================================
+
+@app.post("/rooms/{room_id}/ready")
+def player_ready(room_id: int, current_user: PlayerModel = Depends(get_current_user), db: Session = Depends(get_db)):
+    room = db.query(RoomModel).filter_by(id=room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Комната не найдена")
+    if current_user.username not in [room.host_username, room.guest_username]:
+        raise HTTPException(status_code=403, detail="Вы не состоите в этой комнате")
+    
+    if current_user.username == room.host_username:
+        room.host_ready = 1
+    elif current_user.username == room.guest_username:
+        room.guest_ready = 1
+    db.commit()
+    
+    # Если оба игрока готовы, выбираем случайно, кто ходит первым,
+    # переводим комнату в состояние "rolling" и сбрасываем ready-флаги.
+    if room.host_ready and room.guest_ready:
+        turn = random.choice(["host", "guest"])
+        room.turn = turn
+        room.host_ready = 0
+        room.guest_ready = 0
+        room.status = "rolling"
+        db.commit()
+        asyncio.create_task(manager.broadcast(room_id, {
+            "event": "round_start",
+            "payload": {"turn": turn, "stage": room.stage}
+        }))
+    return {"message": "Готовность подтверждена."}
+
+    # =========================================
+# Эндпоинт предложения переигровки (rematch_offer)
+# =========================================
+
+@app.post("/rooms/{room_id}/rematch_offer")
+def rematch_offer(room_id: int, current_user: PlayerModel = Depends(get_current_user), db: Session = Depends(get_db)):
+    room = db.query(RoomModel).filter_by(id=room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Комната не найдена")
+    if room.status != "finished":
+        raise HTTPException(status_code=400, detail="Игра не завершена")
+    room.rematch_offer = current_user.username
+    db.commit()
+    asyncio.create_task(manager.broadcast(room_id, {
+        "event": "rematch_offer",
+        "payload": {"from": current_user.username}
+    }))
+    return {"message": "Предложение о переигровке отправлено."}
+
+# =========================================
+# Эндпоинт ответа на предложение переигровки (rematch_response)
+# =========================================
+
+class RematchResponse(BaseModel):
+    accept: bool
+
+@app.post("/rooms/{room_id}/rematch_response")
+def rematch_response(room_id: int, response: RematchResponse, current_user: PlayerModel = Depends(get_current_user), db: Session = Depends(get_db)):
+    room = db.query(RoomModel).filter_by(id=room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Комната не найдена")
+    if room.status != "finished":
+        raise HTTPException(status_code=400, detail="Игра не завершена")
+    # Проверяем, что предложение переигровки было сделано другим игроком
+    if room.rematch_offer == "" or room.rematch_offer == current_user.username:
+        raise HTTPException(status_code=400, detail="Нет корректного предложения переиграть")
+    
+    if response.accept:
+        # Сбрасываем состояние комнаты для новой игры (сохраняем ставки, если нужно – можно добавить дополнительную логику)
+        room.stage = 1
+        room.host_total = 0
+        room.guest_total = 0
+        room.host_stage_result = 0
+        room.guest_stage_result = 0
+        room.status = "ready"  # Ждем подтверждения готовности игроков
+        room.rematch_offer = ""
+        db.commit()
+        asyncio.create_task(manager.broadcast(room_id, {
+            "event": "rematch_accepted",
+            "payload": {"message": "Переигровка принята. Нажмите 'Готов' для начала нового раунда."}
+        }))
+        return {"message": "Переигровка принята."}
+    else:
+        asyncio.create_task(manager.broadcast(room_id, {
+            "event": "rematch_declined",
+            "payload": {"message": "Переигровка отклонена."}
+        }))
+        room.rematch_offer = ""
+        db.commit()
+        return {"message": "Переигровка отклонена."}
