@@ -732,7 +732,7 @@ def place_bet(
 # Эндпоинт броска кубика (игровой этап)
 # ====================================
 
-@app.post("/rooms/{room_id}/roll")@app.post("/rooms/{room_id}/roll")
+@app.post("/rooms/{room_id}/roll")
 async def roll_dice(
     room_id: int,
     current_user: PlayerModel = Depends(get_current_user),
