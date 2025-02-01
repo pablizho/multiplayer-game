@@ -1195,16 +1195,14 @@ async function deleteRoom(roomId) {
 // Функция для отображения игрового интерфейса (вызывается, когда вы присоединяетесь к комнате или создаёте её)
 function showGameRoom(roomId, host, guest) {
   currentRoomId = roomId;
-  // Сохраняем имена участников глобально
   window.currentHost = host;
   window.currentGuest = guest;
-  
   const roomInfo = document.getElementById("room-info");
   roomInfo.textContent = `Комната #${roomId}. Хост: ${host}, Гость: ${guest || '---'}`;
-  
-  const gameRoomOverlay = document.getElementById("game-room-overlay");
-  gameRoomOverlay.classList.remove("hidden");
+  document.getElementById("game-room-overlay").classList.remove("hidden");
 }
+
+
 
 // Обработчик закрытия игрового интерфейса
 document.getElementById("close-game-room-btn").addEventListener("click", () => {

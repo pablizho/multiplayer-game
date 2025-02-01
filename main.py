@@ -539,14 +539,12 @@ def create_room(
     current_user: PlayerModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Создаем новую комнату с текущим пользователем как host,
-    # обнуляем все игровые параметры.
     new_room = RoomModel(
         host_username=current_user.username,
         guest_username=None,
         host_bet=0,
         guest_bet=0,
-        status="waiting",    # Изначально ожидание подключения второго игрока
+        status="waiting",    # Ожидание подключения второго игрока
         stage=1,
         host_ready=0,
         guest_ready=0,
@@ -709,14 +707,20 @@ def place_bet(
 # ====================================
 
 @app.post("/rooms/{room_id}/roll")
-async def roll_dice(room_id: int, current_user: PlayerModel = Depends(get_current_user), db: Session = Depends(get_db)):
+async def roll_dice(
+    room_id: int, 
+    current_user: PlayerModel = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
     room = db.query(RoomModel).filter_by(id=room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Комната не найдена")
     if room.status != "rolling":
         raise HTTPException(status_code=400, detail="Сейчас нельзя бросать кубик")
     
-    # Проверяем, что ход именно у этого игрока
+    # Проверяем, что ход определён и что это действительно ход текущего игрока
+    if room.turn not in ["host", "guest"]:
+        raise HTTPException(status_code=400, detail="Ход не определён")
     if (room.turn == "host" and current_user.username != room.host_username) or \
        (room.turn == "guest" and current_user.username != room.guest_username):
         raise HTTPException(status_code=400, detail="Сейчас не ваш ход")
@@ -725,59 +729,80 @@ async def roll_dice(room_id: int, current_user: PlayerModel = Depends(get_curren
     dice_value = random.randint(1, 6)
     
     if room.turn == "host":
+        # Если хост ещё не бросал в этом раунде
+        if room.host_stage_result != 0:
+            raise HTTPException(status_code=400, detail="Вы уже бросали кубик в этом раунде")
         room.host_stage_result = dice_value
         room.host_total += dice_value
-        # Передаем ход автоматически гостю
+        # После броска хоста передаём ход гостю
         room.turn = "guest"
-    else:
+        db.commit()
+        payload = {
+            "dice_value": dice_value,
+            "player": room.host_username,
+            "host_total": room.host_total,
+            "guest_total": room.guest_total,
+            "stage": room.stage,
+            "status": room.status,
+            "message": f"Хост бросил кубик: {dice_value}"
+        }
+        await manager.broadcast(room_id, {"event": "dice_result", "payload": payload})
+        return {"message": "Хост бросил кубик", "dice": dice_value}
+    
+    elif room.turn == "guest":
+        # Перед броском гостя убедимся, что хост уже бросил
+        if room.host_stage_result == 0:
+            raise HTTPException(status_code=400, detail="Хост еще не бросил кубик")
+        if room.guest_stage_result != 0:
+            raise HTTPException(status_code=400, detail="Вы уже бросали кубик в этом раунде")
         room.guest_stage_result = dice_value
         room.guest_total += dice_value
-        # Передаем ход автоматически хосту
-        room.turn = "host"
-    
-    # Если последний раунд (например, после 3-го раунда игра завершается)
-    if room.stage >= 3:
-        room.status = "finished"
-    else:
-        # Увеличиваем номер раунда, если это конец текущего раунда
-        room.stage += 1
-        # Статус остается "rolling", так как готовность запрашивается только в первом раунде
-        # а дальше ход передается автоматически
-    db.commit()
-    
-    payload = {
-        "dice_value": dice_value,
-        "player": current_user.username,
-        "stage": room.stage if room.stage <= 3 else 3,
-        "host_total": room.host_total,
-        "guest_total": room.guest_total,
-        "status": room.status,
-        "turn": room.turn  # передаваем текущий ход
-    }
-    await manager.broadcast(room_id, {
-        "event": "dice_result",
-        "payload": payload
-    })
-    
-    if room.status == "finished":
-        if room.host_total > room.guest_total:
-            winner = room.host_username
-        elif room.guest_total > room.host_total:
-            winner = room.guest_username
-        else:
-            winner = "tie"
-        final_message = "Ничья! Предложите переиграть." if winner == "tie" else f"Победитель: {winner}"
-        payload_final = {
-            "final_message": final_message,
-            "winner": winner,
+        
+        payload = {
+            "dice_value": dice_value,
+            "player": room.guest_username,
             "host_total": room.host_total,
-            "guest_total": room.guest_total
+            "guest_total": room.guest_total,
+            "stage": room.stage,
+            "status": room.status,
+            "message": f"Гость бросил кубик: {dice_value}"
         }
-        await manager.broadcast(room_id, {
-            "event": "game_finished",
-            "payload": payload_final
-        })
-    return {"message": "Кубик брошен", "dice": dice_value}
+        
+        # Завершаем раунд: если это последний (например, 3-й), игра заканчивается
+        if room.stage >= 3:
+            room.status = "finished"
+        else:
+            room.stage += 1
+            # Сбрасываем результаты текущего раунда для нового
+            room.host_stage_result = 0
+            room.guest_stage_result = 0
+            # Устанавливаем новый ход. Здесь можно задать правило:
+            // например, пусть в новом раунде всегда начинает хост
+            room.turn = "host"
+        db.commit()
+        await manager.broadcast(room_id, {"event": "dice_result", "payload": payload})
+        
+        if room.status == "finished":
+            if room.host_total > room.guest_total:
+                winner = room.host_username
+            elif room.guest_total > room.host_total:
+                winner = room.guest_username
+            else:
+                winner = "tie"
+            final_message = "Ничья! Предложите переиграть." if winner == "tie" else f"Победитель: {winner}"
+            payload_final = {
+                "final_message": final_message,
+                "winner": winner,
+                "host_total": room.host_total,
+                "guest_total": room.guest_total
+            }
+            await manager.broadcast(room_id, {"event": "game_finished", "payload": payload_final})
+        else:
+            # Начинаем новый раунд: отправляем событие round_start с информацией о новом этапе и очередности
+            await manager.broadcast(room_id, {"event": "round_start", "payload": {"turn": room.turn, "stage": room.stage}})
+        return {"message": "Гость бросил кубик", "dice": dice_value}
+
+
 
 
 
