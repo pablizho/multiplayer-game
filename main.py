@@ -868,7 +868,8 @@ async def roll_dice(
                 }
             })
     
-    return {"message": f"{role === 'host' ? 'Хост' : 'Гость'} бросил кубик", "dice": dice_value}
+    return {"message": f"{'Хост' if role == 'host' else 'Гость'} бросил кубик", "dice": dice_value}
+
 
 
 
