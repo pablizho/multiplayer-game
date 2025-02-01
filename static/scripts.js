@@ -1204,6 +1204,7 @@ function showGameRoom(roomId, host, guest) {
 
 
 
+
 // Обработчик закрытия игрового интерфейса
 document.getElementById("close-game-room-btn").addEventListener("click", () => {
   const gameRoomOverlay = document.getElementById("game-room-overlay");
