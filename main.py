@@ -695,7 +695,7 @@ def place_bet(
 # ====================================
 
 @app.post("/rooms/{room_id}/roll")
-def roll_dice(room_id: int, current_user: PlayerModel = Depends(get_current_user), db: Session = Depends(get_db)):
+async def roll_dice(room_id: int, current_user: PlayerModel = Depends(get_current_user), db: Session = Depends(get_db)):
     room = db.query(RoomModel).filter_by(id=room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Комната не найдена")
@@ -728,7 +728,6 @@ def roll_dice(room_id: int, current_user: PlayerModel = Depends(get_current_user
             room.status = "finished"
     db.commit()
     
-    # Отправляем через WebSocket событие с результатом броска
     payload = {
         "dice_value": dice_value,
         "player": current_user.username,
@@ -737,10 +736,11 @@ def roll_dice(room_id: int, current_user: PlayerModel = Depends(get_current_user
         "guest_total": room.guest_total,
         "status": room.status
     }
-    asyncio.create_task(manager.broadcast(room_id, {
+    # Отправляем через WebSocket событие с результатом броска
+    await manager.broadcast(room_id, {
         "event": "dice_result",
         "payload": payload
-    }))
+    })
     
     # Если игра завершена, определяем победителя (или ничью) и оповещаем игроков
     if room.status == "finished":
@@ -757,12 +757,11 @@ def roll_dice(room_id: int, current_user: PlayerModel = Depends(get_current_user
             "host_total": room.host_total,
             "guest_total": room.guest_total
         }
-        asyncio.create_task(manager.broadcast(room_id, {
+        await manager.broadcast(room_id, {
             "event": "game_finished",
             "payload": payload_final
-        }))
+        })
     return {"message": "Кубик брошен", "dice": dice_value}
-
 
 
 #endpoint для переигровки
@@ -809,7 +808,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: int):
 # ====================================
 
 @app.post("/rooms/{room_id}/ready")
-def player_ready(room_id: int, current_user: PlayerModel = Depends(get_current_user), db: Session = Depends(get_db)):
+async def player_ready(room_id: int, current_user: PlayerModel = Depends(get_current_user), db: Session = Depends(get_db)):
     room = db.query(RoomModel).filter_by(id=room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Комната не найдена")
@@ -864,36 +863,34 @@ class RematchResponse(BaseModel):
     accept: bool
 
 @app.post("/rooms/{room_id}/rematch_response")
-def rematch_response(room_id: int, response: RematchResponse, current_user: PlayerModel = Depends(get_current_user), db: Session = Depends(get_db)):
+async def rematch_response(room_id: int, response: RematchResponse, current_user: PlayerModel = Depends(get_current_user), db: Session = Depends(get_db)):
     room = db.query(RoomModel).filter_by(id=room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Комната не найдена")
     if room.status != "finished":
         raise HTTPException(status_code=400, detail="Игра не завершена")
-    # Проверяем, что предложение переигровки было сделано другим игроком
     if room.rematch_offer == "" or room.rematch_offer == current_user.username:
         raise HTTPException(status_code=400, detail="Нет корректного предложения переиграть")
     
     if response.accept:
-        # Сбрасываем состояние комнаты для новой игры (сохраняем ставки, если нужно – можно добавить дополнительную логику)
         room.stage = 1
         room.host_total = 0
         room.guest_total = 0
         room.host_stage_result = 0
         room.guest_stage_result = 0
-        room.status = "ready"  # Ждем подтверждения готовности игроков
+        room.status = "ready"
         room.rematch_offer = ""
         db.commit()
-        asyncio.create_task(manager.broadcast(room_id, {
+        await manager.broadcast(room_id, {
             "event": "rematch_accepted",
             "payload": {"message": "Переигровка принята. Нажмите 'Готов' для начала нового раунда."}
-        }))
+        })
         return {"message": "Переигровка принята."}
     else:
-        asyncio.create_task(manager.broadcast(room_id, {
+        await manager.broadcast(room_id, {
             "event": "rematch_declined",
             "payload": {"message": "Переигровка отклонена."}
-        }))
+        })
         room.rematch_offer = ""
         db.commit()
         return {"message": "Переигровка отклонена."}

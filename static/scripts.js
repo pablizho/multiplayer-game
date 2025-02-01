@@ -1350,8 +1350,7 @@ function resetGameUI() {
   document.getElementById("roll-btn").disabled = true;
 }
 
-// Привязка обработчиков к кнопкам игровой комнаты
-document.getElementById("roll-btn").addEventListener("click", rollDice);
+
 // Кнопка "Готов" уже указана в разметке с onclick="markReady()"
 
 // Если ранее использовался код rematch(), его можно убрать или заменить на вызовы proposeRematch()/answerRematch().
