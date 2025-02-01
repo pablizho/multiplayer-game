@@ -22,12 +22,20 @@ function connectWebSocket(roomId) {
       // Новый раунд начинается – сервер сообщает, чей ход
       currentTurn = data.payload.turn;
       currentStage = data.payload.stage;
-      document.getElementById("game-result").innerHTML = 
+      document.getElementById("game-result").innerHTML =
         `<p>Раунд ${currentStage} начался. Ход: ${currentTurn === "host" ? "Хост" : "Гость"}</p>`;
-      // Показываем кнопку "Готов" (скрытая ранее)
+      // Показываем кнопку "Готов"
       document.getElementById("ready-btn").classList.remove("hidden");
-      // Блокируем кнопку броска до нажатия "Готов"
-      document.getElementById("roll-btn").disabled = true;
+      
+      // Определяем текущего пользователя
+      const currentUser = localStorage.getItem("username");
+      // Разблокируем кнопку броска только если текущий пользователь – тот, кому отдан ход
+      if ((currentTurn === "host" && currentUser === window.currentHost) ||
+          (currentTurn === "guest" && currentUser === window.currentGuest)) {
+        document.getElementById("roll-btn").disabled = false;
+      } else {
+        document.getElementById("roll-btn").disabled = true;
+      }
     }
     else if (data.event === "dice_result") {
       // Получен результат броска
@@ -35,14 +43,12 @@ function connectWebSocket(roomId) {
       document.getElementById("game-result").innerHTML += 
         `<p>${payload.player} бросил кубик: ${payload.dice_value}</p>
          <p>Текущий счёт: Хост ${payload.host_total} – Гость ${payload.guest_total}</p>`;
-      // Если статус игры "finished", дальше обрабатываем финальное сообщение
       if (payload.status === "finished") {
         // Завершена игра – блокируем кнопки
         document.getElementById("roll-btn").disabled = true;
         document.getElementById("ready-btn").disabled = true;
       } else {
-        // Если раунд завершён (то есть ход сменился на пустой),
-        // значит раунд окончен – нужно ждать подтверждения готовности для следующего
+        // Если раунд завершён, значит, необходимо ждать готовности для следующего раунда
         if (!payload.playerTurn) {
           document.getElementById("roll-btn").disabled = true;
           document.getElementById("ready-btn").classList.remove("hidden");
@@ -50,33 +56,26 @@ function connectWebSocket(roomId) {
       }
     }
     else if (data.event === "game_finished") {
-      // Игра окончена, сервер посылает финальное сообщение
       const payload = data.payload;
       document.getElementById("game-result").innerHTML += `<p>${payload.final_message}</p>`;
-      // Если игра закончилась ничьей, можно показать кнопку предложения переигровки
       if (payload.winner === "tie") {
         showRematchOfferUI();
-      }
-      else {
-        // Иначе игра окончена – можно заблокировать интерфейс
+      } else {
         document.getElementById("roll-btn").disabled = true;
         document.getElementById("ready-btn").disabled = true;
       }
     }
     else if (data.event === "rematch_offer") {
-      // Другой игрок предложил переигровку – предлагаем ответить
       const offerFrom = data.payload.from;
       const accept = confirm(`Игрок ${offerFrom} предлагает переиграть матч. Принять?`);
       answerRematch(accept);
     }
     else if (data.event === "rematch_accepted") {
-      // Переигровка принята – обновляем интерфейс для новой игры
       alert(data.payload.message);
       resetGameUI();
     }
     else if (data.event === "rematch_declined") {
       alert(data.payload.message);
-      // Можно закрыть окно игры или предложить выйти из комнаты
       document.getElementById("game-room-overlay").classList.add("hidden");
     }
   };
@@ -84,6 +83,8 @@ function connectWebSocket(roomId) {
     console.log("WebSocket соединение закрыто");
   };
 }
+
+
 
 
 
