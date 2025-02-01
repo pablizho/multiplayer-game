@@ -6,7 +6,9 @@ let ws;  // глобальная переменная для WebSocket
 
 // Функция для установления WebSocket-подключения к комнате
 function connectWebSocket(roomId) {
-  ws = new WebSocket(`ws://${window.location.host}/ws/rooms/${roomId}`);
+  // Если страница загружена через HTTPS, используем wss, иначе ws
+  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${protocol}://${window.location.host}/ws/rooms/${roomId}`);
   ws.onopen = () => {
     console.log("WebSocket подключение установлено для комнаты", roomId);
   };
@@ -15,7 +17,6 @@ function connectWebSocket(roomId) {
     console.log("Получено обновление:", data);
     // Обработка обновлений игрового состояния:
     if (data.event === "game_update") {
-      // Обновляем окно результатов игры
       const resultDiv = document.getElementById("game-result");
       resultDiv.innerHTML = `
         <p>${data.payload.round_result}</p>
@@ -23,23 +24,21 @@ function connectWebSocket(roomId) {
         <p>Счёт: Хост ${data.payload.host_wins} – Гость ${data.payload.guest_wins}</p>
         <p>Ставка: Хост ${data.payload.host_bet} – Гость ${data.payload.guest_bet}</p>
       `;
-      // Если игра завершена, блокируем кнопки и предлагаем переиграть
       if (data.payload.status === "finished") {
         document.getElementById("place-bet-btn").disabled = true;
         document.getElementById("roll-btn").disabled = true;
         showRematchModal(data.payload.final_message);
       }
     }
-    // Обновление баланса
     if (data.event === "update_balance") {
       document.getElementById("stat-coins").textContent = data.payload.coins;
     }
-    // Здесь можно добавить обработку других событий по необходимости
   };
   ws.onclose = () => {
     console.log("WebSocket соединение закрыто");
   };
 }
+
 
 
 // Вызов функции восстановления при загрузке страницы
