@@ -7,83 +7,100 @@ let currentTurn = "";  // "host" или "guest"
 let currentStage = 1;  // Номер текущего раунда
 
 
-// Функция для установления WebSocket‑подключения к комнате
+// Функция для подключения к WebSocket
 function connectWebSocket(roomId) {
-  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+  const protocol = (window.location.protocol === "https:") ? "wss" : "ws";
   ws = new WebSocket(`${protocol}://${window.location.host}/ws/rooms/${roomId}`);
+
   ws.onopen = () => {
-    console.log("WebSocket подключение установлено для комнаты", roomId);
+    console.log("WebSocket подключён к комнате", roomId);
   };
+
   ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
-    console.log("Получено обновление:", data);
-    // Обработка новых событий от сервера:
+    console.log("WS получил:", data);
+    if (!data.event) return;
+
+    // 1) round_start
     if (data.event === "round_start") {
-      // Новый раунд начинается – сервер сообщает, чей ход
-      currentTurn = data.payload.turn;
-      currentStage = data.payload.stage;
+        // Сервер сказал: новый раунд.
+      const p = data.payload;
+      currentTurn = p.turn;   // "host" или "guest"
+      currentStage = p.stage; // номер раунда
       document.getElementById("game-result").innerHTML =
-        `<p>Раунд ${currentStage} начался. Ход: ${currentTurn === "host" ? "Хост" : "Гость"}</p>`;
-      // Показываем кнопку "Готов"
+        `<p>Раунд ${currentStage} начался. Ходит: ${currentTurn === "host" ? "Хост" : "Гость"}</p>`;
+
+      // Если вы хотите снова «Готов» перед каждым раундом, делайте так:
       document.getElementById("ready-btn").classList.remove("hidden");
-      
-      // Определяем текущего пользователя
-      const currentUser = localStorage.getItem("username");
-      // Разблокируем кнопку броска только если текущий пользователь – тот, кому отдан ход
-      if ((currentTurn === "host" && currentUser === window.currentHost) ||
-          (currentTurn === "guest" && currentUser === window.currentGuest)) {
-        document.getElementById("roll-btn").disabled = false;
-      } else {
-        document.getElementById("roll-btn").disabled = true;
-      }
+      // ...но отключите кнопку броска:
+      document.getElementById("roll-btn").disabled = true;
     }
+
+    // 2) dice_result
     else if (data.event === "dice_result") {
-      // Получен результат броска
-      const payload = data.payload;
+      const p = data.payload;
       document.getElementById("game-result").innerHTML += 
-        `<p>${payload.player} бросил кубик: ${payload.dice_value}</p>
-         <p>Текущий счёт: Хост ${payload.host_total} – Гость ${payload.guest_total}</p>`;
-      if (payload.status === "finished") {
-        // Завершена игра – блокируем кнопки
-        document.getElementById("roll-btn").disabled = true;
-        document.getElementById("ready-btn").disabled = true;
-      } else {
-        // Если раунд завершён, значит, необходимо ждать готовности для следующего раунда
-        if (!payload.playerTurn) {
+        `<p>${p.player} бросил кубик: ${p.dice_value}</p>
+         <p>Счёт: Хост ${p.host_total} – Гость ${p.guest_total}</p>`;
+
+      // Если статус не finished, смотрим, у кого следующий ход:
+      if (p.status !== "finished") {
+        // p.playerTurn = "guest" или "host" или null
+        if (p.playerTurn === "guest") {
+          currentTurn = "guest";
+        } else if (p.playerTurn === "host") {
+          currentTurn = "host";
+        } else {
+          // null — значит, раунд закончился, ждём round_start
+          currentTurn = null;
+        }
+
+        // Разблокируем кнопку броска тому, у кого ход:
+        const currentUser = localStorage.getItem("username");
+        if (currentTurn === "host" && currentUser === window.currentHost) {
+          document.getElementById("roll-btn").disabled = false;
+        } else if (currentTurn === "guest" && currentUser === window.currentGuest) {
+          document.getElementById("roll-btn").disabled = false;
+        } else {
           document.getElementById("roll-btn").disabled = true;
-          document.getElementById("ready-btn").classList.remove("hidden");
         }
       }
     }
+
+    // 3) game_finished
     else if (data.event === "game_finished") {
-      const payload = data.payload;
-      document.getElementById("game-result").innerHTML += `<p>${payload.final_message}</p>`;
-      if (payload.winner === "tie") {
-        showRematchOfferUI();
-      } else {
-        document.getElementById("roll-btn").disabled = true;
-        document.getElementById("ready-btn").disabled = true;
-      }
+      const p = data.payload;
+      document.getElementById("game-result").innerHTML += `<p>${p.final_message}</p>`;
+      document.getElementById("roll-btn").disabled = true;
+      document.getElementById("ready-btn").disabled = true;
+      // Можно показать кнопку "Переиграть":
+      showRematchOfferUI();
     }
+
+    // 4) rematch_offer
     else if (data.event === "rematch_offer") {
-      const offerFrom = data.payload.from;
-      const accept = confirm(`Игрок ${offerFrom} предлагает переиграть матч. Принять?`);
-      answerRematch(accept);
+      const from = data.payload.from;
+      const accept = confirm(`Игрок ${from} предлагает переиграть. Принять?`);
+      answerRematch(yes);
     }
+
+    // 5) rematch_accepted
     else if (data.event === "rematch_accepted") {
       alert(data.payload.message);
       resetGameUI();
     }
+
+    // 6) rematch_declined
     else if (data.event === "rematch_declined") {
       alert(data.payload.message);
       document.getElementById("game-room-overlay").classList.add("hidden");
     }
   };
+
   ws.onclose = () => {
-    console.log("WebSocket соединение закрыто");
+    console.log("WebSocket закрыт");
   };
 }
-
 
 
 
