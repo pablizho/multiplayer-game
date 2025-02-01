@@ -777,7 +777,7 @@ async def roll_dice(
             room.host_stage_result = 0
             room.guest_stage_result = 0
             # Устанавливаем новый ход. Здесь можно задать правило:
-            // например, пусть в новом раунде всегда начинает хост
+            #например, пусть в новом раунде всегда начинает хост
             room.turn = "host"
         db.commit()
         await manager.broadcast(room_id, {"event": "dice_result", "payload": payload})
