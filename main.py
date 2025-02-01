@@ -732,7 +732,7 @@ def place_bet(
 # Эндпоинт броска кубика (игровой этап)
 # ====================================
 
-@app.post("/rooms/{room_id}/roll")
+@app.post("/rooms/{room_id}/roll")@app.post("/rooms/{room_id}/roll")
 async def roll_dice(
     room_id: int,
     current_user: PlayerModel = Depends(get_current_user),
@@ -747,7 +747,7 @@ async def roll_dice(
         logger.error(f"Попытка броска кубика в состоянии {room.status}")
         raise HTTPException(status_code=400, detail="Сейчас нельзя бросать кубик")
     
-    # Определяем роль
+    # Определяем роль игрока
     if current_user.username == room.host_username:
         role = "host"
     elif current_user.username == room.guest_username:
@@ -793,8 +793,8 @@ async def roll_dice(
                 "event": "turn_change",
                 "payload": {"turn": "guest", "message": "Ход переходит гостю"}
             })
-        return {"message": "Хост бросил кубик", "dice": dice_value}
-    
+        # Здесь не производится сброс раунда – это мы добавим ниже.
+
     elif role == "guest":
         if room.guest_stage_result != 0:
             logger.error("Гость уже бросал в этом раунде")
@@ -825,45 +825,50 @@ async def roll_dice(
                 "event": "turn_change",
                 "payload": {"turn": "host", "message": "Ход переходит хосту"}
             })
+        # Если хост уже сделал бросок, логика сброса раунда выполнится ниже.
+    
+    # Общая проверка: если оба игрока сделали бросок, начинаем новый раунд или завершаем игру.
+    db.refresh(room)
+    if room.host_stage_result != 0 and room.guest_stage_result != 0:
+        if room.stage < 3:
+            room.stage += 1
+            room.host_stage_result = 0
+            room.guest_stage_result = 0
+            room.turn = random.choice(["host", "guest"])
+            db.commit()
+            logger.info(f"Раунд завершён. Начинается раунд {room.stage}. Ход: {room.turn}")
+            await manager.broadcast(room_id, {
+                "event": "round_start",
+                "payload": {
+                    "turn": room.turn,
+                    "stage": room.stage,
+                    "status": room.status,
+                    "message": f"Раунд {room.stage} начался"
+                }
+            })
         else:
-            if room.stage < 3:
-                room.stage += 1
-                room.host_stage_result = 0
-                room.guest_stage_result = 0
-                room.turn = random.choice(["host", "guest"])
-                db.commit()
-                logger.info(f"Раунд завершён. Начинается раунд {room.stage}. Ход: {room.turn}")
-                await manager.broadcast(room_id, {
-                    "event": "round_start",
-                    "payload": {
-                        "turn": room.turn,
-                        "stage": room.stage,
-                        "status": room.status,
-                        "message": f"Раунд {room.stage} начался"
-                    }
-                })
+            room.status = "finished"
+            db.commit()
+            if room.host_total > room.guest_total:
+                winner = room.host_username
+            elif room.guest_total > room.host_total:
+                winner = room.guest_username
             else:
-                room.status = "finished"
-                db.commit()
-                if room.host_total > room.guest_total:
-                    winner = room.host_username
-                elif room.guest_total > room.host_total:
-                    winner = room.guest_username
-                else:
-                    winner = "tie"
-                final_message = "Ничья! Предложите переигровку." if winner == "tie" else f"Победитель: {winner}"
-                logger.info(f"Игра завершена. {final_message}")
-                await manager.broadcast(room_id, {
-                    "event": "game_finished",
-                    "payload": {
-                        "final_message": final_message,
-                        "winner": winner,
-                        "host_total": room.host_total,
-                        "guest_total": room.guest_total,
-                        "status": room.status
-                    }
-                })
-        return {"message": "Гость бросил кубик", "dice": dice_value}
+                winner = "tie"
+            final_message = "Ничья! Предложите переигровку." if winner == "tie" else f"Победитель: {winner}"
+            logger.info(f"Игра завершена. {final_message}")
+            await manager.broadcast(room_id, {
+                "event": "game_finished",
+                "payload": {
+                    "final_message": final_message,
+                    "winner": winner,
+                    "host_total": room.host_total,
+                    "guest_total": room.guest_total,
+                    "status": room.status
+                }
+            })
+    
+    return {"message": f"{role === 'host' ? 'Хост' : 'Гость'} бросил кубик", "dice": dice_value}
 
 
 
