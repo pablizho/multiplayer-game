@@ -729,12 +729,12 @@ async def roll_dice(
     dice_value = random.randint(1, 6)
     
     if room.turn == "host":
-        # Если хост ещё не бросал в этом раунде
         if room.host_stage_result != 0:
             raise HTTPException(status_code=400, detail="Вы уже бросали кубик в этом раунде")
+        # Сохраняем результат хоста
         room.host_stage_result = dice_value
         room.host_total += dice_value
-        # После броска хоста передаём ход гостю
+        # Передаём ход гостю
         room.turn = "guest"
         db.commit()
         payload = {
@@ -747,14 +747,16 @@ async def roll_dice(
             "message": f"Хост бросил кубик: {dice_value}"
         }
         await manager.broadcast(room_id, {"event": "dice_result", "payload": payload})
+        # После броска хоста сервер отправляет событие round_start с обновлённой информацией о ходе (для гостя)
+        await manager.broadcast(room_id, {"event": "round_start", "payload": {"turn": room.turn, "stage": room.stage}})
         return {"message": "Хост бросил кубик", "dice": dice_value}
     
     elif room.turn == "guest":
-        # Перед броском гостя убедимся, что хост уже бросил
         if room.host_stage_result == 0:
-            raise HTTPException(status_code=400, detail="Хост еще не бросил кубик")
+            raise HTTPException(status_code=400, detail="Хост ещё не бросил кубик")
         if room.guest_stage_result != 0:
             raise HTTPException(status_code=400, detail="Вы уже бросали кубик в этом раунде")
+        # Сохраняем результат гостя
         room.guest_stage_result = dice_value
         room.guest_total += dice_value
         
@@ -768,16 +770,15 @@ async def roll_dice(
             "message": f"Гость бросил кубик: {dice_value}"
         }
         
-        # Завершаем раунд: если это последний (например, 3-й), игра заканчивается
         if room.stage >= 3:
             room.status = "finished"
         else:
+            # Завершаем текущий раунд и начинаем новый
             room.stage += 1
-            # Сбрасываем результаты текущего раунда для нового
+            # Сбрасываем результаты раунда
             room.host_stage_result = 0
             room.guest_stage_result = 0
-            # Устанавливаем новый ход. Здесь можно задать правило:
-            #например, пусть в новом раунде всегда начинает хост
+            # Задаём новый ход – например, пусть в новом раунде начинает хост
             room.turn = "host"
         db.commit()
         await manager.broadcast(room_id, {"event": "dice_result", "payload": payload})
@@ -798,9 +799,10 @@ async def roll_dice(
             }
             await manager.broadcast(room_id, {"event": "game_finished", "payload": payload_final})
         else:
-            # Начинаем новый раунд: отправляем событие round_start с информацией о новом этапе и очередности
+            # Начинаем новый раунд – уведомляем всех о новом ходе
             await manager.broadcast(room_id, {"event": "round_start", "payload": {"turn": room.turn, "stage": room.stage}})
         return {"message": "Гость бросил кубик", "dice": dice_value}
+
 
 
 
