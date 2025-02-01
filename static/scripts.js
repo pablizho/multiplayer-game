@@ -26,16 +26,33 @@ function connectWebSocket(roomId) {
         currentTurn = p.turn;
         currentStage = p.stage;
         console.log("Раунд начался, ход:", currentTurn);
-        // Показ сообщения и разблокировка кнопки, если текущий пользователь соответствует тому, у кого ход
+        // Разблокировка кнопки, если текущий пользователь – тот, у кого ход
         const currentUser = localStorage.getItem("username");
         console.log("currentUser:", currentUser, "window.currentHost:", window.currentHost, "window.currentGuest:", window.currentGuest);
         if ((currentTurn === "host" && currentUser === window.currentHost) || 
             (currentTurn === "guest" && currentUser === window.currentGuest)) {
             document.getElementById("roll-btn").disabled = false;
-            console.log("Кнопка 'Бросить кубики' разблокирована");
+            console.log("Кнопка 'Бросить кубики' разблокирована (round_start)");
         } else {
             document.getElementById("roll-btn").disabled = true;
-            console.log("Кнопка 'Бросить кубики' остается заблокированной");
+            console.log("Кнопка 'Бросить кубики' остается заблокированной (round_start)");
+        }
+    }
+    
+    // Добавляем обработку события "turn_change"
+    else if (data.event === "turn_change") {
+        const p = data.payload;
+        currentTurn = p.turn;  // обновляем текущий ход
+        console.log("Turn change, новый ход:", currentTurn);
+        const currentUser = localStorage.getItem("username");
+        console.log("currentUser:", currentUser, "window.currentHost:", window.currentHost, "window.currentGuest:", window.currentGuest);
+        if ((currentTurn === "host" && currentUser === window.currentHost) || 
+            (currentTurn === "guest" && currentUser === window.currentGuest)) {
+            document.getElementById("roll-btn").disabled = false;
+            console.log("Кнопка 'Бросить кубики' разблокирована (turn_change)");
+        } else {
+            document.getElementById("roll-btn").disabled = true;
+            console.log("Кнопка 'Бросить кубики' остается заблокированной (turn_change)");
         }
     }
 
@@ -45,20 +62,14 @@ function connectWebSocket(roomId) {
       document.getElementById("game-result").innerHTML += 
         `<p>${p.player} бросил кубик: ${p.dice_value}</p>
          <p>Счёт: Хост ${p.host_total} – Гость ${p.guest_total}</p>`;
-
-      // Если статус не finished, смотрим, у кого следующий ход:
       if (p.status !== "finished") {
-        // p.playerTurn = "guest" или "host" или null
         if (p.playerTurn === "guest") {
           currentTurn = "guest";
         } else if (p.playerTurn === "host") {
           currentTurn = "host";
         } else {
-          // null — значит, раунд закончился, ждём round_start
           currentTurn = null;
         }
-
-        // Разблокируем кнопку броска тому, у кого ход:
         const currentUser = localStorage.getItem("username");
         if (currentTurn === "host" && currentUser === window.currentHost) {
           document.getElementById("roll-btn").disabled = false;
@@ -76,7 +87,6 @@ function connectWebSocket(roomId) {
       document.getElementById("game-result").innerHTML += `<p>${p.final_message}</p>`;
       document.getElementById("roll-btn").disabled = true;
       document.getElementById("ready-btn").disabled = true;
-      // Можно показать кнопку "Переиграть":
       showRematchOfferUI();
     }
 
@@ -104,6 +114,7 @@ function connectWebSocket(roomId) {
     console.log("WebSocket закрыт");
   };
 }
+
 
 
 
@@ -1221,6 +1232,7 @@ function showGameRoom(roomId, host, guest) {
     window.currentGuest = guest;
     const roomInfo = document.getElementById("room-info");
     roomInfo.textContent = `Комната #${roomId}. Хост: ${host}, Гость: ${guest || '---'}`;
+    document.getElementById("room-info").textContent = `Комната #${roomId}. Хост: ${host}, Гость: ${guest || '---'}`;
     document.getElementById("game-room-overlay").classList.remove("hidden");
 }
 
