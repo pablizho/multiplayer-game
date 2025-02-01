@@ -21,10 +21,45 @@
         </div>
     </div>
 
-    
+   <!-- Большое модальное окно для комнат -->
+<div id="rooms-modal" class="rooms-modal hidden">
+  <div class="rooms-wrapper">
+    <!-- Левая область: список комнат -->
+    <div class="rooms-list">
+      <h2>Список комнат</h2>
+      <div id="rooms-list-scroll">
+        <!-- Здесь динамически заполняется список комнат -->
+      </div>
+    </div>
+    <!-- Правая область: действия -->
+    <div class="rooms-actions">
+      <!-- Крестик закрытия окна -->
+      <button id="close-rooms-btn" class="close-btn">✖</button>
+      <!-- Область с кнопкой создания комнаты -->
+      <div class="create-room-area">
+        <button id="create-room-btn">Создать комнату</button>
+      </div>
+    </div>
+  </div>
+  <!-- Оверлей для игрового интерфейса комнаты -->
+  <div id="game-room-overlay" class="game-room-overlay hidden">
+      <div class="game-room-window">
+         <h3>Игра в комнате</h3>
+         <p id="room-info"></p>
+         <input type="number" id="bet-amount" placeholder="Введите ставку">
+         <button id="place-bet-btn">Сделать ставку</button>
+         <button id="roll-btn">Бросить кубики</button>
+         <div id="game-result"></div>
+         <button id="close-game-room-btn" class="close-btn">Закрыть игру</button>
+      </div>
+  </div>
+</div>
+
+  
     <div class="container">
         <!-- Кнопка для открытия меню -->
         <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+        <button id="rooms-btn">Комнаты</button>
 
         <!-- Боковая панель -->
         <aside id="stats-panel" class="stats-panel" style="display: none;">
@@ -39,6 +74,7 @@
                     <p><b>Rank:</b> <span id="stat-rank">---</span></p>
                     <p><b>Free Rolls:</b> <span id="stat-free-rolls">10</span></p>
                 </div>
+
                 <button onclick="toggleSettingsMenu()">⚙️</button>
                 <div id="settings-menu" class="compact-menu hidden">
                     <button onclick="deleteProfile()">🗑️</button>

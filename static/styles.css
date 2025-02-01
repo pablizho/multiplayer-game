@@ -410,20 +410,153 @@ input[type="number"]:focus {
 /* Стили для модального окна */
 .modal {
     position: fixed;
-    top: 0;
-    left: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0, 0, 0, 0.6);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 3000;
+     background: rgba(0, 0, 0, 0.5); /* полупрозрачный фон */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000; /* поверх всего */
 }
 
 .modal.hidden {
     display: none;
 }
+
+
+/* Стиль для большого модального окна комнат */
+/* Модальное окно на весь экран с затемнением----------------------------------------------------------------------- */
+/* Модальное окно на весь экран с затемнением */
+.rooms-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.8); /* затемнённый фон */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* Обёртка внутри окна комнат */
+.rooms-wrapper {
+  background: #16213e; /* тёмный фон, соответствующий теме игры */
+  width: 90%;
+  height: 90%;
+  display: flex;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
+}
+
+
+/* Левая область: список комнат */
+.rooms-list {
+  flex: 2;
+  border-right: 1px solid #444;
+  padding: 20px;
+  color: #fff; /* белый текст */
+  display: flex;
+  flex-direction: column;
+}
+.rooms-list h2 {
+  margin: 0;
+  padding-bottom: 10px;
+  text-align: center;
+}
+#rooms-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  margin-top: 10px;
+}
+
+/* Правая область: действия */
+.rooms-actions {
+  flex: 1;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: #1a1a2e; /* немного темнее, чем левая область */
+  color: #fff;
+  align-items: center;
+}
+.close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+}
+.rooms-actions .close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  color: #fff;
+  cursor: pointer;
+}
+.create-room-area {
+  margin-top: auto;
+  text-align: center;
+}
+}
+.create-room-area button {
+  background: #533483;
+  border: none;
+  padding: 10px 20px;
+  font-size: 16px;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+.create-room-area button:hover {
+  background: #e94560;
+}
+
+/* Стили для каждой записи комнаты в списке */
+.room-item {
+  border-bottom: 1px solid #444;
+  padding: 10px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #fff;
+}
+.room-item div {
+  text-align: center;
+}
+.room-item button {
+  background: #533483;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #fff;
+  transition: background 0.3s;
+}
+.room-item button:hover {
+  background: #e94560;
+}
+
+
+.new-room {
+  background-color: #f0f0f0; /* например, выделить новым элементом */
+  margin: 0 auto;
+  width: 90%; /* или другое значение для центровки */
+}
+
 
 .modal-content {
     background: #16213e;
@@ -517,6 +650,46 @@ input[type="number"]:focus {
 }
 .hidden {
     display: none;
+}
+
+
+
+/* Стили для оверлея игрового интерфейса внутри окна комнат */
+.game-room-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.7); /* затемненный фон поверх списка комнат */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100; /* выше, чем содержимое rooms-modal */
+}
+
+.game-room-overlay.hidden {
+  display: none;
+}
+
+.game-room-window {
+  background: #16213e;
+  padding: 20px;
+  border-radius: 8px;
+  width: 80%;
+  max-width: 600px;
+  text-align: center;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
+}
+
+/* (Если нужно, можно добавить стили для кнопки закрытия внутри игрового окна) */
+.game-room-window .close-btn {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  color: #fff;
+  cursor: pointer;
+  margin-top: 10px;
 }
 
 
@@ -636,6 +809,7 @@ input[type="number"]:focus {
     .stats-panel {
         width: 200px;
         left: -210px;
+        z-index: 4000; /* или выше, чем у модальных окон */
     }
 
      .menu-toggle {
@@ -733,6 +907,7 @@ input[type="number"]:focus {
 
     .stats-panel {
         min-width: 200px;
+        z-index: 4000; /* или выше, чем у модальных окон */
     }
 
     .avatar {

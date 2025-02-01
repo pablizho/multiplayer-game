@@ -1,29 +1,65 @@
 const baseUrl = window.location.origin;
 
+let currentRoomId = null; // Глобальная переменная для хранения id текущей комнаты
+let ws;  // глобальная переменная для WebSocket
+
+
+// Функция для установления WebSocket-подключения к комнате
+function connectWebSocket(roomId) {
+  ws = new WebSocket(`ws://${window.location.host}/ws/rooms/${roomId}`);
+  ws.onopen = () => {
+    console.log("WebSocket подключение установлено для комнаты", roomId);
+  };
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    console.log("Получено обновление:", data);
+    // Обработка обновлений игрового состояния:
+    if (data.event === "game_update") {
+      // Обновляем окно результатов игры
+      const resultDiv = document.getElementById("game-result");
+      resultDiv.innerHTML = `
+        <p>${data.payload.round_result}</p>
+        <p>Кубики: Хост ${data.payload.host_dice} – Гость ${data.payload.guest_dice}</p>
+        <p>Счёт: Хост ${data.payload.host_wins} – Гость ${data.payload.guest_wins}</p>
+        <p>Ставка: Хост ${data.payload.host_bet} – Гость ${data.payload.guest_bet}</p>
+      `;
+      // Если игра завершена, блокируем кнопки и предлагаем переиграть
+      if (data.payload.status === "finished") {
+        document.getElementById("place-bet-btn").disabled = true;
+        document.getElementById("roll-btn").disabled = true;
+        showRematchModal(data.payload.final_message);
+      }
+    }
+    // Обновление баланса
+    if (data.event === "update_balance") {
+      document.getElementById("stat-coins").textContent = data.payload.coins;
+    }
+    // Здесь можно добавить обработку других событий по необходимости
+  };
+  ws.onclose = () => {
+    console.log("WebSocket соединение закрыто");
+  };
+}
 
 
 // Вызов функции восстановления при загрузке страницы
 
 document.addEventListener("DOMContentLoaded", () => {
-     console.log("✅ DOM загружен, назначаем обработчики...");
+    console.log("✅ DOM загружен, назначаем обработчики...");
 
-     // Настраиваем кнопку открытия модального окна
+    // Настраиваем кнопки модального окна регистрации
     const openModalBtn = document.getElementById("open-register-modal");
     if (openModalBtn) {
         openModalBtn.addEventListener("click", openModal);
     } else {
         console.error("❌ Кнопка #open-register-modal не найдена!");
     }
-
-    // Настраиваем кнопку отмены
     const cancelModalBtn = document.getElementById("modal-cancel");
     if (cancelModalBtn) {
         cancelModalBtn.addEventListener("click", closeModal);
     } else {
         console.error("❌ Кнопка #modal-cancel не найдена!");
     }
-
-    // Настраиваем кнопку регистрации
     const registerBtn = document.getElementById("modal-register");
     if (registerBtn) {
         registerBtn.addEventListener("click", handleRegister);
@@ -31,32 +67,45 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("❌ Кнопка #modal-register не найдена!");
     }
 
-
-     const betInput = document.getElementById("bet");
-
+    // Обработчик для поля ввода ставки
+    const betInput = document.getElementById("bet");
     if (betInput) {
         betInput.addEventListener("keypress", function(event) {
             if (event.key === "Enter") {
                 event.preventDefault();
-                this.blur(); // Убирает фокус с поля, закрывая клавиатуру
+                this.blur();
             }
         });
     }
 
+    // Настраиваем элементы модального окна комнат
+    const roomsBtn = document.getElementById("rooms-btn");
+    const roomsModal = document.getElementById("rooms-modal");
+
+    if (roomsBtn) {
+      roomsBtn.addEventListener("click", () => {
+        roomsModal.classList.remove("hidden");
+        loadRooms(); // загрузка списка комнат
+      });
+    }
+
+    const closeRoomsBtn = document.getElementById("close-rooms-btn");
+    if (closeRoomsBtn) {
+      closeRoomsBtn.addEventListener("click", () => {
+        roomsModal.classList.add("hidden");
+      });
+    }
+
     adjustLayout();
     window.addEventListener("resize", adjustLayout);
-
     checkAuth();
 
     const currentPath = window.location.pathname;
-
     const token = localStorage.getItem("token");
-    
+
     if (token && !window.location.pathname.includes("game.html")) {
-        // Если есть токен, но мы не на game.html - перенаправляем
         window.location.href = "game.html";
     } else if (!token && window.location.pathname.includes("game.html")) {
-        // Если нет токена, но мы на game.html - перенаправляем на регистрацию
         window.location.href = "register.html";
     }
 
@@ -64,7 +113,6 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("Находимся на странице регистрации. Проверка токена не требуется.");
         return;
     }
-
     if (currentPath.includes("game.html")) {
         console.log("Находимся на странице игры. Проверка токена...");
         restoreState();
@@ -73,6 +121,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("Неизвестный путь. Перенаправление...");
     window.location.href = "register.html";
 });
+
 
 function applyBet() {
     document.getElementById("bet").blur(); // Закрывает клавиатуру
@@ -605,9 +654,13 @@ function updateProfile(username, data) {
       "info"
     );
 
+
+
     // <-- Добавляем вызов для таймеров, т.к. username уже точно не "Guest"
     fetchTimers();
 }
+
+
 
 
 //  функцию для удаления профиля:
@@ -929,3 +982,218 @@ function hideAllAnimations() {
     document.getElementById("dice-animation").classList.add("hidden");
 }
 
+
+//Функция загрузки списка комнат:-----------------------------------------------------------------------------------------------------------------
+async function loadRooms() {
+  const baseUrl = window.location.origin;
+  try {
+    const response = await fetch(`${baseUrl}/rooms`);
+    if (!response.ok) {
+      throw new Error("Не удалось загрузить комнаты");
+    }
+    const data = await response.json();
+    const container = document.getElementById("rooms-list-scroll");
+    container.innerHTML = ""; // очистка контейнера
+
+    const currentUser = localStorage.getItem("username");
+    let userHasRoom = false;
+
+    data.rooms.forEach(room => {
+      if (currentUser === room.host) {
+        userHasRoom = true;
+      }
+      // Создаем элемент для комнаты
+      const roomDiv = document.createElement("div");
+      roomDiv.classList.add("room-item");
+      roomDiv.style.borderBottom = "1px solid #ccc";
+      roomDiv.style.padding = "10px 0";
+      roomDiv.style.display = "flex";
+      roomDiv.style.justifyContent = "space-between";
+      roomDiv.style.alignItems = "center";
+      
+      // Левая часть записи: информация о комнате
+      const infoDiv = document.createElement("div");
+      infoDiv.innerHTML = `<strong>Комната #${room.room_id}</strong><br>
+        Хост: ${room.host}<br>
+        Участников: ${room.participants}`;
+      
+      // Правая часть записи: кнопка (если можно присоединиться)
+      const actionDiv = document.createElement("div");
+      if (currentUser !== room.host) {
+        const joinBtn = document.createElement("button");
+        joinBtn.textContent = "Присоединиться";
+        joinBtn.onclick = () => joinRoom(room.room_id);
+        actionDiv.appendChild(joinBtn);
+      } else {
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "Удалить";
+        deleteBtn.onclick = () => deleteRoom(room.room_id);
+        actionDiv.appendChild(deleteBtn);
+      }
+      
+      roomDiv.appendChild(infoDiv);
+      roomDiv.appendChild(actionDiv);
+      container.appendChild(roomDiv);
+    });
+
+    // Если пользователь уже создал комнату, скрываем кнопку создания комнаты
+    const createRoomBtn = document.querySelector(".create-room-area button");
+    if (userHasRoom) {
+      createRoomBtn.style.display = "none";
+    } else {
+      createRoomBtn.style.display = "inline-block";
+    }
+  } catch (error) {
+    console.error("Ошибка загрузки комнат:", error);
+    alert("Ошибка загрузки комнат: " + error.message);
+  }
+}
+
+
+
+
+//Функция создания комнаты:
+document.getElementById("create-room-btn").addEventListener("click", async () => {
+  const baseUrl = window.location.origin;
+  const token = localStorage.getItem("token");
+  try {
+    const response = await fetch(`${baseUrl}/rooms/create`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token
+      }
+    });
+    const data = await response.json();
+    alert(data.message);
+    loadRooms(); // обновляем список комнат
+    // Подключаемся по WebSocket к созданной комнате
+    connectWebSocket(data.room_id);
+    
+    // Показываем игровой интерфейс
+    showGameRoom(data.room_id, localStorage.getItem("username"), "");
+  } catch (error) {
+    console.error("Ошибка создания комнаты:", error);
+    alert("Ошибка создания комнаты: " + error.message);
+  }
+});
+
+
+
+
+
+//Функции подключения к комнате и удаления:
+async function joinRoom(roomId) {
+  const baseUrl = window.location.origin;
+  const token = localStorage.getItem("token");
+  try {
+    const response = await fetch(`${baseUrl}/rooms/${roomId}/join`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token
+      }
+    });
+    const data = await response.json();
+    alert(data.message);
+    loadRooms(); // обновляем список комнат
+    // Подключаемся по WebSocket к созданной комнате
+    connectWebSocket(data.room_id);
+    connectWebSocket(currentRoomId);
+    // Показываем игровой интерфейс
+    showGameRoom(data.room_id, localStorage.getItem("username"), "");
+  } catch (error) {
+    console.error("Ошибка создания комнаты:", error);
+    alert("Ошибка создания комнаты: " + error.message);
+  }
+}
+
+
+async function deleteRoom(roomId) {
+  const baseUrl = window.location.origin;
+  const token = localStorage.getItem("token");
+  try {
+    const response = await fetch(`${baseUrl}/rooms/${roomId}`, {
+      method: "DELETE",
+      headers: {
+        "Authorization": "Bearer " + token
+      }
+    });
+    const data = await response.json();
+    alert(data.message);
+    loadRooms(); // обновляем список комнат
+  } catch (error) {
+    console.error("Ошибка удаления комнаты:", error);
+    alert("Ошибка удаления комнаты: " + error.message);
+  }
+}
+
+
+
+// Функция для отображения игрового интерфейса (вызывается, когда вы присоединяетесь к комнате или создаёте её)
+function showGameRoom(roomId, host, guest) {
+  currentRoomId = roomId;
+  const roomInfo = document.getElementById("room-info");
+  roomInfo.textContent = `Комната #${roomId}. Хост: ${host}, Гость: ${guest || '---'}`;
+  
+  // Показываем оверлей игрового интерфейса внутри rooms-modal
+  const gameRoomOverlay = document.getElementById("game-room-overlay");
+  gameRoomOverlay.classList.remove("hidden");
+}
+// Обработчик закрытия игрового интерфейса
+document.getElementById("close-game-room-btn").addEventListener("click", () => {
+  const gameRoomOverlay = document.getElementById("game-room-overlay");
+  gameRoomOverlay.classList.add("hidden");
+});
+
+// Функция для отправки ставки через WebSocket
+async function placeBet() {
+  const betAmount = parseInt(document.getElementById("bet-amount").value, 10);
+  if (!betAmount || betAmount <= 0) {
+    alert("Введите корректную сумму ставки!");
+    return;
+  }
+  ws.send(JSON.stringify({
+      event: "bet",
+      payload: { bet: betAmount, room_id: currentRoomId }
+  }));
+}
+
+
+// Функция для броска кубиков (запуска раунда) через WebSocket
+async function rollDice() {
+  ws.send(JSON.stringify({
+      event: "roll",
+      payload: { room_id: currentRoomId }
+  }));
+}
+
+
+// Функция показа окна переигровки
+function showRematchModal(finalMessage) {
+  const rematchConfirmed = confirm(finalMessage + "\nХотите сыграть еще раз?");
+  if (rematchConfirmed) {
+    rematch();
+  } else {
+    // Если игрок отказывается, закрываем игровой интерфейс (оверлей)
+    document.getElementById("game-room-overlay").classList.add("hidden");
+  }
+}
+
+
+// Функция для переигровки: отправляем событие через WebSocket
+async function rematch() {
+  ws.send(JSON.stringify({
+      event: "rematch",
+      payload: { room_id: currentRoomId }
+  }));
+  document.getElementById("place-bet-btn").disabled = false;
+  document.getElementById("roll-btn").disabled = false;
+  document.getElementById("bet-amount").value = "";
+  document.getElementById("game-result").innerHTML = "";
+}
+
+
+// Привязываем обработчики к кнопкам игрового интерфейса
+document.getElementById("place-bet-btn").addEventListener("click", placeBet);
+document.getElementById("roll-btn").addEventListener("click", rollDice);
