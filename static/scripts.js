@@ -1067,8 +1067,9 @@ document.getElementById("create-room-btn").addEventListener("click", async () =>
     alert(data.message);
     loadRooms(); // обновляем список комнат
     // Подключаемся по WebSocket к созданной комнате
-    connectWebSocket(data.room_id);
-    
+    currentRoomId = data.room_id;
+    (currentRoomId);
+
     // Показываем игровой интерфейс
     showGameRoom(data.room_id, localStorage.getItem("username"), "");
   } catch (error) {
@@ -1097,7 +1098,7 @@ async function joinRoom(roomId) {
     alert(data.message);
     loadRooms(); // обновляем список комнат
     // Подключаемся по WebSocket к созданной комнате
-    connectWebSocket(data.room_id);
+    currentRoomId = data.room_id;
     connectWebSocket(currentRoomId);
     // Показываем игровой интерфейс
     showGameRoom(data.room_id, localStorage.getItem("username"), "");
