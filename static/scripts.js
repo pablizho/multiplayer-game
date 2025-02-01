@@ -20,20 +20,23 @@ function connectWebSocket(roomId) {
     const data = JSON.parse(event.data);
     console.log("WS получил:", data);
     if (!data.event) return;
-
-    // 1) round_start
+    
     if (data.event === "round_start") {
-        // Сервер сказал: новый раунд.
-      const p = data.payload;
-      currentTurn = p.turn;   // "host" или "guest"
-      currentStage = p.stage; // номер раунда
-      document.getElementById("game-result").innerHTML =
-        `<p>Раунд ${currentStage} начался. Ходит: ${currentTurn === "host" ? "Хост" : "Гость"}</p>`;
-
-      // Если вы хотите снова «Готов» перед каждым раундом, делайте так:
-      document.getElementById("ready-btn").classList.remove("hidden");
-      // ...но отключите кнопку броска:
-      document.getElementById("roll-btn").disabled = true;
+        const p = data.payload;
+        currentTurn = p.turn;
+        currentStage = p.stage;
+        console.log("Раунд начался, ход:", currentTurn);
+        // Показ сообщения и разблокировка кнопки, если текущий пользователь соответствует тому, у кого ход
+        const currentUser = localStorage.getItem("username");
+        console.log("currentUser:", currentUser, "window.currentHost:", window.currentHost, "window.currentGuest:", window.currentGuest);
+        if ((currentTurn === "host" && currentUser === window.currentHost) || 
+            (currentTurn === "guest" && currentUser === window.currentGuest)) {
+            document.getElementById("roll-btn").disabled = false;
+            console.log("Кнопка 'Бросить кубики' разблокирована");
+        } else {
+            document.getElementById("roll-btn").disabled = true;
+            console.log("Кнопка 'Бросить кубики' остается заблокированной");
+        }
     }
 
     // 2) dice_result
@@ -81,7 +84,7 @@ function connectWebSocket(roomId) {
     else if (data.event === "rematch_offer") {
       const from = data.payload.from;
       const accept = confirm(`Игрок ${from} предлагает переиграть. Принять?`);
-      answerRematch(yes);
+      answerRematch(accept);
     }
 
     // 5) rematch_accepted
@@ -1133,7 +1136,6 @@ async function loadRooms() {
 
 //Функция создания комнаты:
 document.getElementById("create-room-btn").addEventListener("click", async () => {
-  const baseUrl = window.location.origin;
   const token = localStorage.getItem("token");
   try {
     const response = await fetch(`${baseUrl}/rooms/create`, {
@@ -1148,13 +1150,16 @@ document.getElementById("create-room-btn").addEventListener("click", async () =>
     loadRooms(); // обновляем список комнат
     currentRoomId = data.room_id;
     connectWebSocket(currentRoomId);
-    // Вызываем showGameRoom: хост – текущий пользователь, гость пока не определён
     showGameRoom(data.room_id, localStorage.getItem("username"), "");
   } catch (error) {
     console.error("Ошибка создания комнаты:", error);
     alert("Ошибка создания комнаты: " + error.message);
   }
 });
+
+document.getElementById("roll-btn").addEventListener("click", rollDice);
+document.getElementById("place-bet-btn").addEventListener("click", placeBet);
+
 
 
 
@@ -1211,13 +1216,14 @@ async function deleteRoom(roomId) {
 
 // Функция для отображения игрового интерфейса (вызывается, когда вы присоединяетесь к комнате или создаёте её)
 function showGameRoom(roomId, host, guest) {
-  currentRoomId = roomId;
-  window.currentHost = host;
-  window.currentGuest = guest;
-  const roomInfo = document.getElementById("room-info");
-  roomInfo.textContent = `Комната #${roomId}. Хост: ${host}, Гость: ${guest || '---'}`;
-  document.getElementById("game-room-overlay").classList.remove("hidden");
+    currentRoomId = roomId;
+    window.currentHost = host;
+    window.currentGuest = guest;
+    const roomInfo = document.getElementById("room-info");
+    roomInfo.textContent = `Комната #${roomId}. Хост: ${host}, Гость: ${guest || '---'}`;
+    document.getElementById("game-room-overlay").classList.remove("hidden");
 }
+
 
 
 
@@ -1371,14 +1377,3 @@ function resetGameUI() {
   document.getElementById("ready-btn").disabled = false;
   document.getElementById("roll-btn").disabled = true;
 }
-
-
-// Кнопка "Готов" уже указана в разметке с onclick="markReady()"
-
-// Если ранее использовался код rematch(), его можно убрать или заменить на вызовы proposeRematch()/answerRematch().
-
-
-
-// Привязываем обработчики к кнопкам игрового интерфейса
-document.getElementById("place-bet-btn").addEventListener("click", placeBet);
-document.getElementById("roll-btn").addEventListener("click", rollDice);
