@@ -1,6 +1,7 @@
 import os
 import random
 import asyncio
+import logging
 from fastapi.responses import RedirectResponse
 from fastapi.responses import JSONResponse
 from fastapi import FastAPI, HTTPException, Depends
@@ -22,6 +23,13 @@ from sqlalchemy import ForeignKey
 from fastapi import WebSocket, WebSocketDisconnect
 from typing import List, Dict
 
+
+# Настройка базового логгирования
+logging.basicConfig(
+    level=logging.INFO,  # или DEBUG для подробного логирования
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
 class ConnectionManager:
@@ -539,6 +547,7 @@ def create_room(
     current_user: PlayerModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    logger.info(f"Создание комнаты для игрока {current_user.username}")
     new_room = RoomModel(
         host_username=current_user.username,
         guest_username=None,
@@ -558,6 +567,7 @@ def create_room(
     db.add(new_room)
     db.commit()
     db.refresh(new_room)
+    logger.info(f"Комната {new_room.id} создана, статус: {new_room.status}")
     return {
         "message": "Комната создана.",
         "room_id": new_room.id
@@ -590,17 +600,22 @@ def list_rooms(db: Session = Depends(get_db)):
 #Если комната уже заполнена или не существует, возвращается ошибка.
 @app.post("/rooms/{room_id}/join")
 def join_room(room_id: int, current_user: PlayerModel = Depends(get_current_user), db: Session = Depends(get_db)):
+    logger.info(f"Игрок {current_user.username} пытается подключиться к комнате {room_id}")
     room = db.query(RoomModel).filter_by(id=room_id).first()
     if not room:
+        logger.error(f"Комната {room_id} не найдена")
         raise HTTPException(status_code=404, detail="Комната не найдена")
     if room.guest_username:
+        logger.error(f"Комната {room_id} уже занята")
         raise HTTPException(status_code=400, detail="Комната уже занята")
     if room.host_username == current_user.username:
+        logger.error(f"Игрок {current_user.username} не может подключиться к своей же комнате")
         raise HTTPException(status_code=400, detail="Нельзя подключиться к своей же комнате")
     
     room.guest_username = current_user.username
     room.status = "waiting"
     db.commit()
+    logger.info(f"Игрок {current_user.username} подключился к комнате {room_id}")
     return {
         "message": f"Вы подключены к комнате {room_id}",
         "room_id": room.id,
@@ -645,23 +660,29 @@ def place_bet(
     current_user: PlayerModel = Depends(get_current_user), 
     db: Session = Depends(get_db)
 ):
+    logger.info(f"Игрок {current_user.username} делает ставку {request.bet} в комнате {room_id}")
     room = db.query(RoomModel).filter_by(id=room_id).first()
     if not room:
+        logger.error(f"Комната {room_id} не найдена для ставки")
         raise HTTPException(status_code=404, detail="Комната не найдена")
     if room.status == "finished":
+        logger.error(f"Попытка ставки в завершённой игре (комната {room_id})")
         raise HTTPException(status_code=400, detail="Игра уже завершена")
     if request.bet <= 0:
+        logger.error("Ставка должна быть больше 0")
         raise HTTPException(status_code=400, detail="Ставка должна быть больше 0")
     
     # Если текущий пользователь — хост
     if current_user.username == room.host_username:
         if room.host_bet != 0:
+            logger.error("Хост уже сделал ставку")
             raise HTTPException(status_code=400, detail="Ставка уже сделана")
         if current_user.coins < request.bet:
+            logger.error("Недостаточно монет у хоста")
             raise HTTPException(status_code=400, detail="Недостаточно монет")
         room.host_bet = request.bet
         current_user.coins -= request.bet
-
+        logger.info(f"Хост {current_user.username} сделал ставку {request.bet}")
         # Если в комнате гостем является бот, автоматически выставляем для него ставку
         if room.guest_username == "BOT" and room.guest_bet == 0:
             # Здесь можно выбрать логику: ставим ту же сумму, либо случайное число
@@ -669,21 +690,26 @@ def place_bet(
     # Если текущий пользователь — гость
     elif current_user.username == room.guest_username:
         if room.guest_bet != 0:
+            logger.error("Гость уже сделал ставку")
             raise HTTPException(status_code=400, detail="Ставка уже сделана")
         # Если гость – бот, просто записываем ставку (без списания средств)
         if current_user.username == "BOT":
             room.guest_bet = request.bet
         else:
             if current_user.coins < request.bet:
+                logger.error("Недостаточно монет у гостя")
                 raise HTTPException(status_code=400, detail="Недостаточно монет")
             room.guest_bet = request.bet
             current_user.coins -= request.bet
+            logger.info(f"Гость {current_user.username} сделал ставку {request.bet}")
     else:
+        logger.error("Игрок не состоит в комнате")
         raise HTTPException(status_code=403, detail="Вы не состоите в этой комнате")
     
     # Если обе ставки выставлены, меняем статус на in_progress
     if room.host_bet != 0 and room.guest_bet != 0:
         room.status = "in_progress"
+        logger.info(f"Обе ставки сделаны. Комната {room_id} переходит в статус in_progress")
     
     db.commit()
     
@@ -712,35 +738,39 @@ async def roll_dice(
     current_user: PlayerModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    logger.info(f"Игрок {current_user.username} пытается бросить кубик в комнате {room_id}")
     room = db.query(RoomModel).filter_by(id=room_id).first()
     if not room:
+        logger.error("Комната не найдена")
         raise HTTPException(status_code=404, detail="Комната не найдена")
     if room.status != "rolling":
+        logger.error(f"Попытка броска кубика в состоянии {room.status}")
         raise HTTPException(status_code=400, detail="Сейчас нельзя бросать кубик")
     
-    # Определяем роль игрока: host или guest
+    # Определяем роль
     if current_user.username == room.host_username:
         role = "host"
     elif current_user.username == room.guest_username:
         role = "guest"
     else:
+        logger.error("Игрок не состоит в этой комнате")
         raise HTTPException(status_code=403, detail="Вы не состоите в этой комнате")
     
-    # Проверяем, что сейчас ход именно текущего игрока
     if room.turn != role:
+        logger.error(f"Сейчас не ход игрока {current_user.username} (ожидается: {room.turn})")
         raise HTTPException(status_code=400, detail="Сейчас не ваш ход")
     
-    # Бросаем кубик
     dice_value = random.randint(1, 6)
+    logger.info(f"Игрок {current_user.username} ({role}) бросил кубик: {dice_value}")
     
     if role == "host":
         if room.host_stage_result != 0:
+            logger.error("Хост уже бросал в этом раунде")
             raise HTTPException(status_code=400, detail="Вы уже бросали в этом раунде")
         room.host_stage_result = dice_value
         room.host_total += dice_value
         db.commit()
         
-        # Отправляем уведомление о броске
         await manager.broadcast(room_id, {
             "event": "dice_result",
             "payload": {
@@ -751,29 +781,23 @@ async def roll_dice(
                 "stage": room.stage,
                 "message": f"Хост бросил кубик: {dice_value}",
                 "status": room.status,
-                "playerTurn": None  # Пока не определено, переходит управление ниже
+                "playerTurn": None
             }
         })
         
-        # Если гость ещё не бросал, передаём ход гостю
         if room.guest_stage_result == 0:
             room.turn = "guest"
             db.commit()
+            logger.info("Ход передан гостю")
             await manager.broadcast(room_id, {
                 "event": "turn_change",
-                "payload": {
-                    "turn": "guest",
-                    "message": "Ход переходит гостю"
-                }
+                "payload": {"turn": "guest", "message": "Ход переходит гостю"}
             })
-        else:
-            # Если оба игрока уже бросили (на случай, если логика вызова будет иной)
-            pass
-
         return {"message": "Хост бросил кубик", "dice": dice_value}
     
     elif role == "guest":
         if room.guest_stage_result != 0:
+            logger.error("Гость уже бросал в этом раунде")
             raise HTTPException(status_code=400, detail="Вы уже бросали в этом раунде")
         room.guest_stage_result = dice_value
         room.guest_total += dice_value
@@ -789,30 +813,26 @@ async def roll_dice(
                 "stage": room.stage,
                 "message": f"Гость бросил кубик: {dice_value}",
                 "status": room.status,
-                "playerTurn": None  # Пока не определено
+                "playerTurn": None
             }
         })
         
-        # Если другой игрок еще не бросил в этом раунде, передаём ход ему
         if room.host_stage_result == 0:
             room.turn = "host"
             db.commit()
+            logger.info("Ход передан хосту")
             await manager.broadcast(room_id, {
                 "event": "turn_change",
-                "payload": {
-                    "turn": "host",
-                    "message": "Ход переходит хосту"
-                }
+                "payload": {"turn": "host", "message": "Ход переходит хосту"}
             })
         else:
-            # Оба игрока бросили – завершаем раунд
             if room.stage < 3:
                 room.stage += 1
                 room.host_stage_result = 0
                 room.guest_stage_result = 0
-                # Можно выбрать, кто будет ходить следующим (например, случайным образом)
                 room.turn = random.choice(["host", "guest"])
                 db.commit()
+                logger.info(f"Раунд завершён. Начинается раунд {room.stage}. Ход: {room.turn}")
                 await manager.broadcast(room_id, {
                     "event": "round_start",
                     "payload": {
@@ -823,7 +843,6 @@ async def roll_dice(
                     }
                 })
             else:
-                # Если это был 3-й раунд – завершаем игру
                 room.status = "finished"
                 db.commit()
                 if room.host_total > room.guest_total:
@@ -832,7 +851,8 @@ async def roll_dice(
                     winner = room.guest_username
                 else:
                     winner = "tie"
-                final_message = "Ничья! Предложите переиграть." if winner == "tie" else f"Победитель: {winner}"
+                final_message = "Ничья! Предложите переигровку." if winner == "tie" else f"Победитель: {winner}"
+                logger.info(f"Игра завершена. {final_message}")
                 await manager.broadcast(room_id, {
                     "event": "game_finished",
                     "payload": {
@@ -844,6 +864,7 @@ async def roll_dice(
                     }
                 })
         return {"message": "Гость бросил кубик", "dice": dice_value}
+
 
 
 
@@ -904,10 +925,13 @@ async def websocket_endpoint(websocket: WebSocket, room_id: int):
 
 @app.post("/rooms/{room_id}/ready")
 async def player_ready(room_id: int, current_user: PlayerModel = Depends(get_current_user), db: Session = Depends(get_db)):
+    logger.info(f"Игрок {current_user.username} подтверждает готовность в комнате {room_id}")
     room = db.query(RoomModel).filter_by(id=room_id).first()
     if not room:
+        logger.error(f"Комната {room_id} не найдена для подтверждения готовности")
         raise HTTPException(status_code=404, detail="Комната не найдена")
     if current_user.username not in [room.host_username, room.guest_username]:
+        logger.error(f"Игрок {current_user.username} не состоит в комнате {room_id}")
         raise HTTPException(status_code=403, detail="Вы не состоите в этой комнате")
     
     if current_user.username == room.host_username:
@@ -916,11 +940,10 @@ async def player_ready(room_id: int, current_user: PlayerModel = Depends(get_cur
         room.guest_ready = 1
     db.commit()
     
-    # Если хотя бы одна из ставок не установлена, игра не стартует
     if room.host_bet <= 0 or room.guest_bet <= 0:
+        logger.info("Ставки не сделаны обоими игроками")
         return {"message": "Сначала сделайте ставки обоим игрокам"}
     
-    # Если оба игрока готовы и ставки установлены, запускаем игру
     if room.host_ready and room.guest_ready:
         turn = random.choice(["host", "guest"])
         room.turn = turn
@@ -928,14 +951,11 @@ async def player_ready(room_id: int, current_user: PlayerModel = Depends(get_cur
         room.guest_ready = 0
         room.status = "rolling"
         db.commit()
+        logger.info(f"Оба игрока готовы. Выбран ход: {turn}, статус комнаты: rolling")
         await manager.broadcast(room_id, {
             "event": "round_start",
-            "payload": {
-                "turn": turn,
-                "stage": room.stage,
-                "status": room.status,
-                "message": "Раунд начался, бросьте кубик"
-            }
+            "payload": {"turn": turn, "stage": room.stage, "status": room.status,
+                        "message": "Раунд начался, бросьте кубик"}
         })
     return {"message": "Готовность подтверждена."}
 
