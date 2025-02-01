@@ -539,18 +539,32 @@ def create_room(
     current_user: PlayerModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Создаем новую комнату с текущим пользователем как host
+    # Создаем новую комнату с текущим пользователем как host,
+    # обнуляем все игровые параметры.
     new_room = RoomModel(
         host_username=current_user.username,
-        status="waiting"
+        guest_username=None,
+        host_bet=0,
+        guest_bet=0,
+        status="waiting",    # Изначально ожидание подключения второго игрока
+        stage=1,
+        host_ready=0,
+        guest_ready=0,
+        turn="",             # Пока никто не должен бросать кубик
+        host_total=0,
+        guest_total=0,
+        host_stage_result=0,
+        guest_stage_result=0,
+        rematch_offer=""
     )
     db.add(new_room)
     db.commit()
-    db.refresh(new_room)    
+    db.refresh(new_room)
     return {
         "message": "Комната создана.",
         "room_id": new_room.id
     }
+
 
 
 #Получение списка комнат
@@ -713,19 +727,22 @@ async def roll_dice(room_id: int, current_user: PlayerModel = Depends(get_curren
     if room.turn == "host":
         room.host_stage_result = dice_value
         room.host_total += dice_value
-        # Теперь ход переходит к гостю
+        # Передаем ход автоматически гостю
         room.turn = "guest"
     else:
         room.guest_stage_result = dice_value
         room.guest_total += dice_value
-        # Завершаем раунд: сбрасываем turn
-        room.turn = ""
-        # Если текущий раунд не последний, переводим комнату в состояние ожидания готовности
-        if room.stage < 3:
-            room.stage += 1
-            room.status = "ready"
-        else:
-            room.status = "finished"
+        # Передаем ход автоматически хосту
+        room.turn = "host"
+    
+    # Если последний раунд (например, после 3-го раунда игра завершается)
+    if room.stage >= 3:
+        room.status = "finished"
+    else:
+        # Увеличиваем номер раунда, если это конец текущего раунда
+        room.stage += 1
+        # Статус остается "rolling", так как готовность запрашивается только в первом раунде
+        # а дальше ход передается автоматически
     db.commit()
     
     payload = {
@@ -734,15 +751,14 @@ async def roll_dice(room_id: int, current_user: PlayerModel = Depends(get_curren
         "stage": room.stage if room.stage <= 3 else 3,
         "host_total": room.host_total,
         "guest_total": room.guest_total,
-        "status": room.status
+        "status": room.status,
+        "turn": room.turn  # передаваем текущий ход
     }
-    # Отправляем через WebSocket событие с результатом броска
     await manager.broadcast(room_id, {
         "event": "dice_result",
         "payload": payload
     })
     
-    # Если игра завершена, определяем победителя (или ничью) и оповещаем игроков
     if room.status == "finished":
         if room.host_total > room.guest_total:
             winner = room.host_username
@@ -762,6 +778,7 @@ async def roll_dice(room_id: int, current_user: PlayerModel = Depends(get_curren
             "payload": payload_final
         })
     return {"message": "Кубик брошен", "dice": dice_value}
+
 
 
 #endpoint для переигровки
@@ -821,8 +838,7 @@ async def player_ready(room_id: int, current_user: PlayerModel = Depends(get_cur
         room.guest_ready = 1
     db.commit()
     
-    # Если оба игрока готовы, выбираем случайно, кто ходит первым,
-    # переводим комнату в состояние "rolling" и сбрасываем ready-флаги.
+    # Если оба игрока готовы, переводим комнату в состояние "rolling" и выбираем, кто ходит первым
     if room.host_ready and room.guest_ready:
         turn = random.choice(["host", "guest"])
         room.turn = turn
@@ -830,11 +846,12 @@ async def player_ready(room_id: int, current_user: PlayerModel = Depends(get_cur
         room.guest_ready = 0
         room.status = "rolling"
         db.commit()
-        asyncio.create_task(manager.broadcast(room_id, {
+        await manager.broadcast(room_id, {
             "event": "round_start",
             "payload": {"turn": turn, "stage": room.stage}
-        }))
+        })
     return {"message": "Готовность подтверждена."}
+
 
     # =========================================
 # Эндпоинт предложения переигровки (rematch_offer)
