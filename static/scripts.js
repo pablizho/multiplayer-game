@@ -1295,22 +1295,23 @@ async function markReady() {
 
 // Новая функция для броска кубика через игровой endpoint
 async function rollDice() {
-  try {
-    const token = localStorage.getItem("token");
-    const response = await fetch(`${baseUrl}/rooms/${currentRoomId}/roll`, {
-      method: "POST",
-      headers: {
-         "Content-Type": "application/json",
-         "Authorization": "Bearer " + token
-      }
-    });
-    const data = await response.json();
-    console.log("Результат броска:", data.dice);
-    // Интерфейс обновится через WS-сообщение "dice_result"
-  } catch (error) {
-    console.error("Ошибка броска кубика:", error);
-  }
+    console.log("rollDice() вызвана");
+    try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${baseUrl}/rooms/${currentRoomId}/roll`, {
+            method: "POST",
+            headers: {
+               "Content-Type": "application/json",
+               "Authorization": "Bearer " + token
+            }
+        });
+        const data = await response.json();
+        console.log("Результат броска:", data.dice);
+    } catch (error) {
+        console.error("Ошибка броска кубика:", error);
+    }
 }
+
 
 
 // Функция показа UI для предложения переигровки (например, показываем кнопку "Переиграть")

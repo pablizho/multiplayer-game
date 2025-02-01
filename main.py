@@ -910,7 +910,11 @@ async def player_ready(room_id: int, current_user: PlayerModel = Depends(get_cur
         room.guest_ready = 1
     db.commit()
     
-    # Если оба игрока готовы, переводим комнату в состояние "rolling" и выбираем, кто ходит первым
+    # Добавляем проверку ставок: если хотя бы одна ставка равна 0, то игра не запускается
+    if room.host_bet <= 0 or room.guest_bet <= 0:
+        return {"message": "Сначала сделайте ставки обоим игрокам"}
+    
+    # Если оба игрока готовы и ставки установлены, переводим комнату в состояние "rolling"
     if room.host_ready and room.guest_ready:
         turn = random.choice(["host", "guest"])
         room.turn = turn
@@ -920,10 +924,11 @@ async def player_ready(room_id: int, current_user: PlayerModel = Depends(get_cur
         db.commit()
         await manager.broadcast(room_id, {
             "event": "round_start",
-            "payload": {"turn": turn, "stage": room.stage},
-            "status": room.status
+            "payload": {"turn": turn, "stage": room.stage, "status": room.status,
+                        "message": "Раунд начался, бросьте кубик"}
         })
     return {"message": "Готовность подтверждена."}
+
 
 
     # =========================================
